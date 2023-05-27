@@ -14,13 +14,13 @@ class DroneTrackerNode : public rclcpp::Node
 {
   public:
     DroneTrackerNode() : Node("drone_tracker"){
-      this->drone = std::make_shared<Vehicle>(Vehicle("", this->shared_from_this()));
+      this->drone = std::make_shared<Vehicle>(new Vehicle("", this->shared_from_this()));
 
-      this->pilot = std::make_shared<Pilot>(Pilot());
-      this->pilot->set_vehicle(this->drone);
+      // this->pilot = std::make_shared<Pilot>(Pilot());
+      // this->pilot->set_vehicle(this->drone);
        
-      this->offboard_timer = this->create_wall_timer( 100ms, std::bind(&Pilot::offboard_callback, this->pilot));
-      this->mission_timer = this->create_wall_timer( 500ms, std::bind(&Pilot::mission_update, this->pilot));
+      // this->offboard_timer = this->create_wall_timer( 100ms, std::bind(&Pilot::offboard_callback, this->pilot));
+      // this->mission_timer = this->create_wall_timer( 500ms, std::bind(&Pilot::mission_update, this->pilot));
     }
 
   private:

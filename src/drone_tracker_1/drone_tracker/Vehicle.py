@@ -7,6 +7,8 @@ from px4_msgs.msg import VehicleAttitude
 from px4_msgs.msg import VehicleControlMode
 from px4_msgs.msg import TimesyncStatus
 from px4_msgs.msg import VehicleCommand
+from px4_msgs.msg import TrajectorySetpoint
+from px4_msgs.msg import OffboardControlMode
 
 
 class Vehicle():
@@ -20,6 +22,8 @@ class Vehicle():
 
         self._pub_topics:list = [
             (VehicleCommand, ros_namespace + "/fmu/in/vehicle_command")
+            (OffboardControlMode, ros_namespace + "/fmu/in/offboard_control_mode")
+            (TrajectorySetpoint, ros_namespace + "/fmu/in/trajectory_setpoint")
         ]
 
         self._sub_topics:list = [
@@ -35,6 +39,13 @@ class Vehicle():
         self.vehicle_attitude:VehicleAttitude = None
         self.vehicle_control_mode:VehicleControlMode = None
         self.vehicle_timesync_status:TimesyncStatus = None
+        self.offboard_control_mode:OffboardControlMode = OffboardControlMode()
+
+        self.offboard_control_mode.body_rate = False
+        self.offboard_control_mode.attitude = False
+        self.offboard_control_mode.position = True
+        self.offboard_control_mode.velocity = False
+        self.offboard_control_mode.acceleration = False
 
         # Create subscriptions
         for msg_class, topic in self._sub_topics:
@@ -74,6 +85,9 @@ class Vehicle():
     
     def nav_state(self) -> int:
         return self.vehicle_status.nav_state
+    
+    def get_now_timestamp(self) -> int:
+        return int(self._attached_node.get_clock().now().nanoseconds / 1000)
 
     # ------- COMMANDS --------
     def send_arm_command(self) -> None:
@@ -96,5 +110,17 @@ class Vehicle():
         msg.from_external = True
         msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         return msg
+    
+    def offboard_flight_mode(self) -> None:
+        command_msg = self._create_vehicle_command(VehicleCommand.VEHICLE_CMD_DO_SET_MODE, 1.0, 6.0)
+        self._publishers.get(VehicleCommand).publish(command_msg)
+
+    def publish_offboard_control_signal(self) -> None:
+        self.offboard_control_mode.timestamp = self.get_now_timestamp()
+        self._publishers.get(OffboardControlMode).publish(self.offboard_control_mode)
+
+    def publish_trajectory_setpoint(self, message:TrajectorySetpoint) -> None:
+        self._publishers.get(TrajectorySetpoint).publish(message)
+
 
 

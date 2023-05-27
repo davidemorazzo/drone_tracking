@@ -17,23 +17,25 @@ from rclpy.qos import (
     QoSHistoryPolicy)
 
 from Vehicle import Vehicle
+from Pilot import Pilot
 
 
-class OffboardControl(Node):
+class DroneTracker(Node):
 
     def __init__(self):
-        super().__init__('OffboardControl')
-        self.subscribers = []
-        self.drone = Vehicle()
-        self.drone2 = Vehicle(ros_namespace="drone2", node=self)
+        super().__init__('DroneTracker')
+        self.drone = Vehicle(self)
+        self.pilot = Pilot()
 
-        if not self.drone.is_armed():
-            self.drone.send_arm_command()
+        self.pilot.set_vehicle(self.drone)
+        
+        self.offboard_timer = self.create_timer(0.1, self.pilot.offboard_callback)
+        self.mission_timer = self.create_timer(0.5, self.pilot.mission_update)
 
 def main(args=None):
     rclpy.init(args=args)
     print("Starting offboard control node...\n")
-    offboard_control = OffboardControl()
+    offboard_control = DroneTracker()
     rclpy.spin(offboard_control)
 
     offboard_control.destroy_node()
