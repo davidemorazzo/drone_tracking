@@ -48,13 +48,16 @@ class Pilot():
 				self.next_state = PREFLIGHT_CHECK
 
 		elif self.current_state == ARMING:
-			pass				
-		elif self.current_state == ARMED:
-			pass				
+			if not self.drone.is_armed():
+				self.next_state = ARMED
+				self.logger.info("ARMING=>MISSION")
+			else:
+				self.drone.send_arm_command()
+
 		elif self.current_state == MISSION:
 			pass				
 		elif self.current_state == LANDING:
-			pass				
+			pass
 		elif self.current_state == FAILSAFE:
 			pass		
 		else:

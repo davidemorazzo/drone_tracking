@@ -20,7 +20,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'drone_tracker_py = drone_tracker_py.tracker:main'
+            'drone_tracker_py = drone_tracker_py.tracker:main',
+            'mocap_gazebo = mocap_gazebo.mocap_node_classic:main.'
         ],
     },
 )
