@@ -26,6 +26,7 @@ class Vehicle():
         self._subscribers = []
         self._publishers = {}
         self._attached_node = node
+        self.namespace = ros_namespace
 
         self._qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -136,6 +137,7 @@ class Vehicle():
 
     def publish_trajectory_setpoint(self, message:TrajectorySetpoint) -> None:
         self._publishers.get(TrajectorySetpoint).publish(message)
+    
 
 
 

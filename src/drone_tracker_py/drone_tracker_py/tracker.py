@@ -3,6 +3,7 @@ import time
 from rclpy.node import Node
 from rclpy.clock import Clock
 from rclpy import utilities
+import subprocess
 
 from px4_msgs.msg import OffboardControlMode
 from px4_msgs.msg import TrajectorySetpoint
@@ -24,6 +25,9 @@ class DroneTracker(Node):
 
     def __init__(self):
         super().__init__('DroneTracker')
+        # Start XRCE agent
+        subprocess.Popen(["MicroXRCEAgent", "udp4", "-p", "8888"])
+
         self.drone = Vehicle(self)
         self.pilot = Pilot()
 

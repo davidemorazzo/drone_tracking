@@ -28,6 +28,10 @@ class Pilot():
 
 		self.current_state = self.next_state
 
+		if self.drone.vehicle_status.failsafe:
+			self.logger.warning(f"Vehicle {self.drone.namespace} in failsafe mode")
+			self.current_state = FAILSAFE
+
 		if self.current_state == IDLE:
 			if self.drone.nav_state() == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
 				self.logger.info("IDLE=>PREFLIGHT_CHECK")
@@ -56,7 +60,7 @@ class Pilot():
 		else:
 			self.logger.warning("Unknown mission state. Fallback to IDLE state")
 			self.next_state = IDLE
-		
+
 		
 
 	def offboard_callback(self) -> None:
