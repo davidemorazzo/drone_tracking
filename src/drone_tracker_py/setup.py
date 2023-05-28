@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_name = 'drone_tracker'
+package_name = 'drone_tracker_py'
 
 setup(
     name=package_name,
@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'tracker = drone_tracker.tracker:main'
+            'drone_tracker_py = drone_tracker_py.tracker:main'
         ],
     },
 )

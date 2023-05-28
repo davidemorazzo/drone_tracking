@@ -1,5 +1,7 @@
 import rclpy
 from rclpy.clock import Clock
+from rclpy.node import Node
+import copy
 
 from px4_msgs.msg import VehicleStatus
 from px4_msgs.msg import VehicleOdometry
@@ -10,25 +12,36 @@ from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import TrajectorySetpoint
 from px4_msgs.msg import OffboardControlMode
 
+from rclpy.qos import (
+    QoSProfile, 
+    QoSReliabilityPolicy, 
+    QoSHistoryPolicy)
+
 
 class Vehicle():
 # Class representing the vehicle. Subscribe to PX4 topics to update its state
 
-    def __init__(self, node:rclpy.Node, ros_namespace:str="") -> None:
+    def __init__(self, node:Node, ros_namespace:str="") -> None:
 
         self._subscribers = []
         self._publishers = {}
         self._attached_node = node
 
+        self._qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
         self._pub_topics:list = [
-            (VehicleCommand, ros_namespace + "/fmu/in/vehicle_command")
-            (OffboardControlMode, ros_namespace + "/fmu/in/offboard_control_mode")
+            (VehicleCommand, ros_namespace + "/fmu/in/vehicle_command"),
+            (OffboardControlMode, ros_namespace + "/fmu/in/offboard_control_mode"),
             (TrajectorySetpoint, ros_namespace + "/fmu/in/trajectory_setpoint")
         ]
 
         self._sub_topics:list = [
             (VehicleStatus, ros_namespace + "/fmu/out/vehicle_status"),
-            (VehicleAttitude, ros_namespace + "/fmu/out/Vehicle_attitude"),
+            (VehicleAttitude, ros_namespace + "/fmu/out/vehicle_attitude"),
             (VehicleControlMode, ros_namespace + "/fmu/out/vehicle_control_mode"),
             (TimesyncStatus, ros_namespace + "/fmu/out/timesync_status")
         ]
@@ -50,7 +63,7 @@ class Vehicle():
         # Create subscriptions
         for msg_class, topic in self._sub_topics:
             self._subscribers.append(
-                self._attached_node.create_subscription(msg_class, topic, self._new_message_cb, 10) 
+                self._attached_node.create_subscription(msg_class, topic, self._new_message_cb, self._qos) 
             )
         # Create publishers
         for msg_class, topic in self._pub_topics:
@@ -59,17 +72,19 @@ class Vehicle():
 
     def _new_message_cb(self, msg):
         """ Callback for new messages """
-
+        # self._attached_node.get_logger().info("Message received")
         if isinstance(msg, VehicleStatus):
-            self.vehicle_status = msg
+            self.vehicle_status = copy.copy(msg)
         elif isinstance(msg, VehicleOdometry): 
-            self.vehicle_odometry = msg
+            self.vehicle_odometry = copy.copy(msg)
         elif isinstance(msg, VehicleAttitude): 
-            self.vehicle_attitude = msg
+            self.vehicle_attitude = copy.copy(msg)
         elif isinstance(msg, VehicleControlMode): 
-            self.vehicle_control_mode = msg
+            self.vehicle_control_mode = copy.copy(msg)
         elif isinstance(msg, TimesyncStatus): 
-            self.vehicle_timesync_status = msg
+            self.vehicle_timesync_status = copy.copy(msg)
+        else:
+            self._attached_node.get_logger().warning(f"Message unknown: {msg}")
 
     def is_armed(self) -> bool:
         return self.vehicle_status.arming_state == VehicleStatus.ARMING_STATE_ARMED

@@ -16,8 +16,8 @@ from rclpy.qos import (
     QoSReliabilityPolicy, 
     QoSHistoryPolicy)
 
-from Vehicle import Vehicle
-from Pilot import Pilot
+from .Vehicle import Vehicle
+from .Pilot import Pilot
 
 
 class DroneTracker(Node):
@@ -28,7 +28,6 @@ class DroneTracker(Node):
         self.pilot = Pilot()
 
         self.pilot.set_vehicle(self.drone)
-        
         self.offboard_timer = self.create_timer(0.1, self.pilot.offboard_callback)
         self.mission_timer = self.create_timer(0.5, self.pilot.mission_update)
 
