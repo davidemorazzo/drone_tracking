@@ -19,7 +19,8 @@ def generate_launch_description():
             executable='drone_tracker_py',
             name='drone_tracker_py',
             parameters=[
-                {'namespace':"drone2"}
+                {'namespace':"drone2",
+                 'simulation':True}
             ]),
 
         launch_ros.actions.Node(
@@ -36,7 +37,8 @@ def generate_launch_description():
             executable='drone_tracker_py',
             name='drone_tracker_py',
             parameters=[
-                {'namespace':"drone3"}
+                {'namespace':"drone3",
+                 'simulation':True}
             ]),
 
         launch_ros.actions.Node(

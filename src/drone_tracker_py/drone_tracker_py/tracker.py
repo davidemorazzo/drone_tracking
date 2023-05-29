@@ -27,7 +27,9 @@ class DroneTracker(Node):
         super().__init__('DroneTracker')
 
         self.declare_parameter("namespace", "drone1")
+        self.declare_parameter("simulation", True)
         self.namespace = self.get_parameter("namespace").get_parameter_value().string_value
+        self.simulation = self.get_parameter("simulation").get_parameter_value().bool_value
 
         self.drone = Vehicle(self, self.namespace)
         self.pilot = Pilot()

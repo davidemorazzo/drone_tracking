@@ -2,6 +2,7 @@ import rclpy
 from rclpy.clock import Clock
 from rclpy.node import Node
 import copy
+from CameraTransform import CameraTransform
 
 from px4_msgs.msg import VehicleStatus
 from px4_msgs.msg import VehicleOdometry
@@ -11,6 +12,9 @@ from px4_msgs.msg import TimesyncStatus
 from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import TrajectorySetpoint
 from px4_msgs.msg import OffboardControlMode
+from px4_msgs.msg import ApriltagMarker
+
+from sensor_msgs.msg import Image
 
 from rclpy.qos import (
     QoSProfile, 
@@ -27,6 +31,7 @@ class Vehicle():
         self._publishers = {}
         self._attached_node = node
         self.namespace = ros_namespace
+        self.camera = CameraTransform()
 
         self._qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -44,7 +49,8 @@ class Vehicle():
             (VehicleStatus, '/' + ros_namespace + "/fmu/out/vehicle_status"),
             (VehicleAttitude, '/' + ros_namespace + "/fmu/out/vehicle_attitude"),
             (VehicleControlMode, '/' + ros_namespace + "/fmu/out/vehicle_control_mode"),
-            (TimesyncStatus, '/' + ros_namespace + "/fmu/out/timesync_status")
+            (TimesyncStatus, '/' + ros_namespace + "/fmu/out/timesync_status"),
+            (ApriltagMarker, '/' + ros_namespace + "/apriltag_info") 
         ]
 
         # ------- Messages ----------- 
@@ -81,6 +87,8 @@ class Vehicle():
             self.vehicle_control_mode = copy.copy(msg)
         elif isinstance(msg, TimesyncStatus): 
             self.vehicle_timesync_status = copy.copy(msg)
+        elif isinstance(msg, ApriltagMarker): 
+            self.camera.udpate_marker_pos(copy.copy(msg))
         else:
             self._attached_node.get_logger().warning(f"Message unknown: {msg}")
 
@@ -139,5 +147,8 @@ class Vehicle():
         return self.vehicle_status and \
             self.vehicle_attitude and \
             self.vehicle_control_mode and \
-            self.vehicle_timesync_status and \
-            self.offboard_control_mode
+            self.vehicle_timesync_status
+    
+    def get_marker_pos(self) -> tuple[float]:
+        # TODO: da rivedere
+        return self.camera.marker_3d_pos
