@@ -35,21 +35,20 @@ class Vehicle():
         )
 
         self._pub_topics:list = [
-            (VehicleCommand, ros_namespace + "/fmu/in/vehicle_command"),
-            (OffboardControlMode, ros_namespace + "/fmu/in/offboard_control_mode"),
-            (TrajectorySetpoint, ros_namespace + "/fmu/in/trajectory_setpoint")
+            (VehicleCommand, '/' + ros_namespace + "/fmu/in/vehicle_command"),
+            (OffboardControlMode, '/' + ros_namespace + "/fmu/in/offboard_control_mode"),
+            (TrajectorySetpoint, '/' + ros_namespace + "/fmu/in/trajectory_setpoint")
         ]
 
         self._sub_topics:list = [
-            (VehicleStatus, ros_namespace + "/fmu/out/vehicle_status"),
-            (VehicleAttitude, ros_namespace + "/fmu/out/vehicle_attitude"),
-            (VehicleControlMode, ros_namespace + "/fmu/out/vehicle_control_mode"),
-            (TimesyncStatus, ros_namespace + "/fmu/out/timesync_status")
+            (VehicleStatus, '/' + ros_namespace + "/fmu/out/vehicle_status"),
+            (VehicleAttitude, '/' + ros_namespace + "/fmu/out/vehicle_attitude"),
+            (VehicleControlMode, '/' + ros_namespace + "/fmu/out/vehicle_control_mode"),
+            (TimesyncStatus, '/' + ros_namespace + "/fmu/out/timesync_status")
         ]
 
         # ------- Messages ----------- 
         self.vehicle_status:VehicleStatus = None
-        self.vehicle_odometry:VehicleOdometry = None
         self.vehicle_attitude:VehicleAttitude = None
         self.vehicle_control_mode:VehicleControlMode = None
         self.vehicle_timesync_status:TimesyncStatus = None
@@ -76,8 +75,6 @@ class Vehicle():
         # self._attached_node.get_logger().info("Message received")
         if isinstance(msg, VehicleStatus):
             self.vehicle_status = copy.copy(msg)
-        elif isinstance(msg, VehicleOdometry): 
-            self.vehicle_odometry = copy.copy(msg)
         elif isinstance(msg, VehicleAttitude): 
             self.vehicle_attitude = copy.copy(msg)
         elif isinstance(msg, VehicleControlMode): 
@@ -138,6 +135,9 @@ class Vehicle():
     def publish_trajectory_setpoint(self, message:TrajectorySetpoint) -> None:
         self._publishers.get(TrajectorySetpoint).publish(message)
     
-
-
-
+    def xrce_connected(self) -> bool:
+        return self.vehicle_status and \
+            self.vehicle_attitude and \
+            self.vehicle_control_mode and \
+            self.vehicle_timesync_status and \
+            self.offboard_control_mode

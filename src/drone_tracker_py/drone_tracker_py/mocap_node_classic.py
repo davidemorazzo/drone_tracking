@@ -31,10 +31,10 @@ class MocapNode (Node):
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=1
         )
-        self.declare_parameter("namespace", "", "Drone namespace")
+        self.declare_parameter("namespace", "drone1")
         self.namespace = self.get_parameter("namespace").get_parameter_value().string_value
         # Subscribers
-        self.subscriber_ =      self.create_subscription(Odometry, '/iris/odom', self.listener_cb, 10)
+        self.subscriber_ =      self.create_subscription(Odometry, f'/{self.namespace}/odom', self.listener_cb, 10)
         # Publishers
         self.pose_pub =         self.create_publisher(PoseStamped,      f"/{self.namespace}/pose", 10)
         self.path_pub =         self.create_publisher(Path,             f"/{self.namespace}/path", 10)

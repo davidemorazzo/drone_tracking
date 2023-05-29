@@ -3,7 +3,6 @@ from .Vehicle import *
 IDLE = 1
 PREFLIGHT_CHECK = 2
 ARMING = 3
-ARMED = 4
 MISSION = 5
 LANDING = 6
 FAILSAFE = 7
@@ -28,11 +27,15 @@ class Pilot():
 
 		self.current_state = self.next_state
 
-		if self.drone.vehicle_status.failsafe:
-			self.logger.warning(f"Vehicle {self.drone.namespace} in failsafe mode")
-			self.current_state = FAILSAFE
+		# if self.drone.vehicle_status.failsafe:
+		# 	self.logger.warning(f"Vehicle {self.drone.namespace} in failsafe mode")
+		# 	self.current_state = FAILSAFE
 
 		if self.current_state == IDLE:
+			if not self.drone.xrce_connected():
+				self.next_state = IDLE
+				return
+			
 			if self.drone.nav_state() == VehicleStatus.NAVIGATION_STATE_OFFBOARD:
 				self.logger.info("IDLE=>PREFLIGHT_CHECK")
 				self.next_state = PREFLIGHT_CHECK
@@ -48,14 +51,16 @@ class Pilot():
 				self.next_state = PREFLIGHT_CHECK
 
 		elif self.current_state == ARMING:
-			if not self.drone.is_armed():
-				self.next_state = ARMED
+			if self.drone.is_armed():
+				self.next_state = MISSION
 				self.logger.info("ARMING=>MISSION")
 			else:
 				self.drone.send_arm_command()
 
 		elif self.current_state == MISSION:
-			pass				
+			self._mission_func()
+			self.next_state = MISSION
+
 		elif self.current_state == LANDING:
 			pass
 		elif self.current_state == FAILSAFE:
@@ -72,4 +77,13 @@ class Pilot():
 		self.drone.publish_offboard_control_signal()
 
 	def _mission_func(self) -> None:
-		pass
+		msg = TrajectorySetpoint()
+		msg.timestamp = self.drone.get_now_timestamp()
+		if self.drone.namespace == "drone2":
+			msg.position = [1.0, -1.0, -3.0]
+		elif self.drone.namespace == "drone3":
+			msg.position = [1.0, 1.0, -3.0]
+
+		msg.yaw = 0.0
+		self.drone.publish_trajectory_setpoint(msg)
+		return

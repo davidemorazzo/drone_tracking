@@ -25,10 +25,11 @@ class DroneTracker(Node):
 
     def __init__(self):
         super().__init__('DroneTracker')
-        # Start XRCE agent
-        subprocess.Popen(["MicroXRCEAgent", "udp4", "-p", "8888"])
 
-        self.drone = Vehicle(self)
+        self.declare_parameter("namespace", "drone1")
+        self.namespace = self.get_parameter("namespace").get_parameter_value().string_value
+
+        self.drone = Vehicle(self, self.namespace)
         self.pilot = Pilot()
 
         self.pilot.set_vehicle(self.drone)

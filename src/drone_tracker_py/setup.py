@@ -1,4 +1,6 @@
 from setuptools import setup
+import os
+from glob import glob
 
 package_name = 'drone_tracker_py'
 
@@ -10,6 +12,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name), glob('launch/*launch.[pxy][yma]*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,7 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'drone_tracker_py = drone_tracker_py.tracker:main',
-            'mocap_gazebo = mocap_gazebo.mocap_node_classic:main.'
+            'mocap_gazebo = drone_tracker_py.mocap_node_classic:main.'
         ],
     },
 )
