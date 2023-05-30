@@ -83,10 +83,10 @@ class Pilot():
 		msg = TrajectorySetpoint()
 		msg.timestamp = self.drone.get_now_timestamp()
 		if self.drone.namespace == "drone2":
-			msg.position = [-0.4, 0.0, -1.0]
+			msg.position = [-0.2, 0.0, -1.0]
 			msg.yaw = 0.0
 		elif self.drone.namespace == "drone3":
-			msg.position = [0.4, 0.0, -1.0]
+			msg.position = [5.0, 0.0, -1.0]
 			msg.yaw = 3.1415
 
 		self.drone.publish_trajectory_setpoint(msg)

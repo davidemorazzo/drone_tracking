@@ -31,7 +31,7 @@ class Vehicle():
         self._publishers = {}
         self._attached_node = node
         self.namespace = ros_namespace
-        # self.camera = CameraTransform()
+        self.camera = CameraTransform()
 
         self._qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -88,8 +88,9 @@ class Vehicle():
         elif isinstance(msg, TimesyncStatus): 
             self.vehicle_timesync_status = copy.copy(msg)
         elif isinstance(msg, ApriltagMarker): 
-            # self.camera.udpate_marker_pos(copy.copy(msg))
-            pass
+            self.camera.udpate_marker_pos(copy.copy(msg))
+            d = self.camera.marker_distance
+            self._attached_node.get_logger().info(f"Marker distance = {d}")
         else:
             self._attached_node.get_logger().warning(f"Message unknown: {msg}")
 
@@ -152,5 +153,5 @@ class Vehicle():
     
     def get_marker_pos(self) -> tuple[float]:
         # TODO: da rivedere
-        # return self.camera.marker_3d_pos
+        return self.camera.marker_3d_pos
         pass

@@ -11,6 +11,7 @@ from px4_msgs.msg import ApriltagMarker
 import apriltag
 import cv2
 from cv_bridge import CvBridge
+import math
 
 """Camera Computer vision simulator from Gazebo camera"""
 
@@ -41,6 +42,8 @@ class CameraSim(Node) :
 	def update_last_frame(self, image : Image) -> None:
 		self._last_frame = image
 	
+	def distance(self, pta, ptb) -> float:
+		return math.sqrt((pta[0]-ptb[1])**2 + (pta[1]-ptb[1])**2)
 
 	def _detect_marker(self):
 		image = self.bridge.imgmsg_to_cv2(self._last_frame, 'bgra8')
@@ -60,12 +63,21 @@ class CameraSim(Node) :
 			ptD = (int(ptD[0]), int(ptD[1]))
 			ptA = (int(ptA[0]), int(ptA[1]))
 			(cX, cY) = (int(r.center[0]), int(r.center[1]))
+
+			max_diag = max(
+				self.distance(ptA, ptB),
+				self.distance(ptA, ptC),
+				self.distance(ptA, ptD),
+				self.distance(ptB, ptC),
+				self.distance(ptB, ptD),
+				self.distance(ptC, ptD),			
+			)
 		
 			msg = ApriltagMarker()
 			msg.marker_id = r.tag_id
 			msg.marker_x = cX
 			msg.marker_y = cY
-			msg._marker_rot = self._rot
+			msg._marker_rot = max_diag / math.sqrt(2)
 			msg.marker_rect = self._rect
 			self._marker_pub.publish(msg)
 		
