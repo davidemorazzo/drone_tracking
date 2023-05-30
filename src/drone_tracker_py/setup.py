@@ -24,7 +24,8 @@ setup(
     entry_points={
         'console_scripts': [
             'drone_tracker_py = drone_tracker_py.tracker:main',
-            'mocap_gazebo = drone_tracker_py.mocap_node_classic:main.'
+            'mocap_gazebo = drone_tracker_py.mocap_node_classic:main',
+            'camera_sim = drone_tracker_py.CameraSim:main'
         ],
     },
 )

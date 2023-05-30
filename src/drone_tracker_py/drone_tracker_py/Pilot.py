@@ -58,8 +58,11 @@ class Pilot():
 				self.drone.send_arm_command()
 
 		elif self.current_state == MISSION:
-			self._mission_func()
-			self.next_state = MISSION
+			if self._mission_func():
+				self.next_state = LANDING
+				self.logger.info("MISSION=>LANDING")
+			else:
+				self.next_state = MISSION
 
 		elif self.current_state == LANDING:
 			pass
@@ -76,14 +79,15 @@ class Pilot():
 			return
 		self.drone.publish_offboard_control_signal()
 
-	def _mission_func(self) -> None:
+	def _mission_func(self) -> bool:
 		msg = TrajectorySetpoint()
 		msg.timestamp = self.drone.get_now_timestamp()
 		if self.drone.namespace == "drone2":
-			msg.position = [1.0, -1.0, -1.0]
+			msg.position = [-0.4, 0.0, -1.0]
+			msg.yaw = 0.0
 		elif self.drone.namespace == "drone3":
-			msg.position = [1.0, 1.0, -1.0]
+			msg.position = [0.4, 0.0, -1.0]
+			msg.yaw = 3.1415
 
-		msg.yaw = 0.0
 		self.drone.publish_trajectory_setpoint(msg)
-		return
+		return False

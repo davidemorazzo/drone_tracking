@@ -30,6 +30,14 @@ def generate_launch_description():
             parameters=[
                 {'namespace':"drone2"}
             ]),
+        
+        launch_ros.actions.Node(
+            package='drone_tracker_py',
+            executable='camera_sim',
+            name='drone_tracker_py',
+            parameters=[
+                {'namespace':"drone2"}
+            ]),
 
         # ------- DRONE 3 ---------- #
         launch_ros.actions.Node(
@@ -45,6 +53,14 @@ def generate_launch_description():
             package='drone_tracker_py',
             executable='mocap_gazebo',
             name='mocap_node',
+            parameters=[
+                {'namespace':"drone3"}
+            ]),
+        
+        launch_ros.actions.Node(
+            package='drone_tracker_py',
+            executable='camera_sim',
+            name='drone_tracker_py',
             parameters=[
                 {'namespace':"drone3"}
             ])

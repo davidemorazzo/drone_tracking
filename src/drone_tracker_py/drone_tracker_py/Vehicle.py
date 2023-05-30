@@ -2,7 +2,7 @@ import rclpy
 from rclpy.clock import Clock
 from rclpy.node import Node
 import copy
-from CameraTransform import CameraTransform
+from .CameraTransform import CameraTransform
 
 from px4_msgs.msg import VehicleStatus
 from px4_msgs.msg import VehicleOdometry
@@ -31,7 +31,7 @@ class Vehicle():
         self._publishers = {}
         self._attached_node = node
         self.namespace = ros_namespace
-        self.camera = CameraTransform()
+        # self.camera = CameraTransform()
 
         self._qos = QoSProfile(
             reliability=QoSReliabilityPolicy.BEST_EFFORT,
@@ -88,7 +88,8 @@ class Vehicle():
         elif isinstance(msg, TimesyncStatus): 
             self.vehicle_timesync_status = copy.copy(msg)
         elif isinstance(msg, ApriltagMarker): 
-            self.camera.udpate_marker_pos(copy.copy(msg))
+            # self.camera.udpate_marker_pos(copy.copy(msg))
+            pass
         else:
             self._attached_node.get_logger().warning(f"Message unknown: {msg}")
 
@@ -151,4 +152,5 @@ class Vehicle():
     
     def get_marker_pos(self) -> tuple[float]:
         # TODO: da rivedere
-        return self.camera.marker_3d_pos
+        # return self.camera.marker_3d_pos
+        pass
