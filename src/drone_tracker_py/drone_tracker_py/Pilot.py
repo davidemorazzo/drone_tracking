@@ -1,4 +1,5 @@
 from .Vehicle import *
+from rclpy.node import Node
 
 IDLE = 1
 PREFLIGHT_CHECK = 2
@@ -8,16 +9,23 @@ LANDING = 6
 FAILSAFE = 7
 
 
-class Pilot():
+class Pilot(Node):
 	def __init__(self) -> None:
+		super().__init__('DronePilot')
+		# ------- PARAMETERS ------- #
+		self.declare_parameter("namespace", "drone1")
+		self.declare_parameter("simulation", True)
+		self.namespace = self.get_parameter("namespace").get_parameter_value().string_value
+		self.simulation = self.get_parameter("simulation").get_parameter_value().bool_value
+		# --------- TIMERS -------- #
+		self.offboard_timer = self.create_timer(0.1, self.offboard_callback)
+		self.mission_timer = self.create_timer(0.5, self.mission_update)
+		
 		self.current_state = IDLE
 		self.next_state = IDLE
-		self.drone : Vehicle = None
+		self.drone : Vehicle = Vehicle(self, self.namespace)
+		self.logger = self.get_logger()
 	
-	def set_vehicle(self, my_vehicle:Vehicle) -> None:
-		self.drone = my_vehicle
-		self.logger = self.drone._attached_node.get_logger()
-
 	def mission_update(self) -> None:
 		""" State machine function to execute the arming routine from
 		 offboard mode.  """
@@ -91,3 +99,16 @@ class Pilot():
 
 		self.drone.publish_trajectory_setpoint(msg)
 		return False
+	
+def main(args=None):
+    rclpy.init(args=args)
+    print("Starting Pilot node...\n")
+    offboard_control = Pilot()
+    rclpy.spin(offboard_control)
+
+    offboard_control.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
