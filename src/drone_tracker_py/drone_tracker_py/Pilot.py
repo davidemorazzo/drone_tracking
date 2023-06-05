@@ -13,9 +13,7 @@ class Pilot(Node):
 	def __init__(self) -> None:
 		super().__init__('DronePilot')
 		# ------- PARAMETERS ------- #
-		self.declare_parameter("namespace", "drone1")
 		self.declare_parameter("simulation", True)
-		self.namespace = self.get_parameter("namespace").get_parameter_value().string_value
 		self.simulation = self.get_parameter("simulation").get_parameter_value().bool_value
 		# --------- TIMERS -------- #
 		self.offboard_timer = self.create_timer(0.1, self.offboard_callback)
@@ -23,7 +21,7 @@ class Pilot(Node):
 		
 		self.current_state = IDLE
 		self.next_state = IDLE
-		self.drone : Vehicle = Vehicle(self, self.namespace)
+		self.drone : Vehicle = Vehicle(self)
 		self.logger = self.get_logger()
 	
 	def mission_update(self) -> None:
@@ -90,10 +88,10 @@ class Pilot(Node):
 	def _mission_func(self) -> bool:
 		msg = TrajectorySetpoint()
 		msg.timestamp = self.drone.get_now_timestamp()
-		if self.drone.namespace == "drone2":
+		if self.drone.namespace == "/drone2":
 			msg.position = [-0.2, 0.0, -1.0]
 			msg.yaw = 0.0
-		elif self.drone.namespace == "drone3":
+		elif self.drone.namespace == "/drone3":
 			msg.position = [5.0, 0.0, -1.0]
 			msg.yaw = 3.1415
 

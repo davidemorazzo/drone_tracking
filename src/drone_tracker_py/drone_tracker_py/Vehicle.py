@@ -25,12 +25,12 @@ from rclpy.qos import (
 class Vehicle():
 # Class representing the vehicle. Subscribe to PX4 topics to update its state
 
-    def __init__(self, node:Node, ros_namespace:str="") -> None:
+    def __init__(self, node:Node) -> None:
 
         self._subscribers = []
         self._publishers = {}
         self._attached_node = node
-        self.namespace = ros_namespace
+        self.namespace = self._attached_node.get_namespace()
         self.camera = CameraTransform()
 
         self._qos = QoSProfile(
@@ -40,17 +40,17 @@ class Vehicle():
         )
 
         self._pub_topics:list = [
-            (VehicleCommand, '/' + ros_namespace + "/fmu/in/vehicle_command"),
-            (OffboardControlMode, '/' + ros_namespace + "/fmu/in/offboard_control_mode"),
-            (TrajectorySetpoint, '/' + ros_namespace + "/fmu/in/trajectory_setpoint")
+            (VehicleCommand,  "/fmu/in/vehicle_command"),
+            (OffboardControlMode, "/fmu/in/offboard_control_mode"),
+            (TrajectorySetpoint, "/fmu/in/trajectory_setpoint")
         ]
 
         self._sub_topics:list = [
-            (VehicleStatus, '/' + ros_namespace + "/fmu/out/vehicle_status"),
-            (VehicleAttitude, '/' + ros_namespace + "/fmu/out/vehicle_attitude"),
-            (VehicleControlMode, '/' + ros_namespace + "/fmu/out/vehicle_control_mode"),
-            (TimesyncStatus, '/' + ros_namespace + "/fmu/out/timesync_status"),
-            (ApriltagMarker, '/' + ros_namespace + "/apriltag_info") 
+            (VehicleStatus, "/fmu/out/vehicle_status"),
+            (VehicleAttitude, "/fmu/out/vehicle_attitude"),
+            (VehicleControlMode, "/fmu/out/vehicle_control_mode"),
+            (TimesyncStatus, "/fmu/out/timesync_status"),
+            (ApriltagMarker, "/apriltag_info") 
         ]
 
         # ------- Messages ----------- 
@@ -69,11 +69,13 @@ class Vehicle():
         # Create subscriptions
         for msg_class, topic in self._sub_topics:
             self._subscribers.append(
-                self._attached_node.create_subscription(msg_class, topic, self._new_message_cb, self._qos) 
+                self._attached_node.create_subscription(msg_class, self.namespace + topic, 
+                                                        self._new_message_cb, self._qos) 
             )
         # Create publishers
         for msg_class, topic in self._pub_topics:
-            self._publishers[msg_class] = self._attached_node.create_publisher(msg_class, topic, 10) 
+            self._publishers[msg_class] = self._attached_node.create_publisher(msg_class, 
+                                                        self.namespace + topic, 10) 
 
 
     def _new_message_cb(self, msg):

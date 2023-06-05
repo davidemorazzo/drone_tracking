@@ -2,8 +2,11 @@ import launch
 import launch_ros.actions
 
 def generate_launch_description():
-    return launch.LaunchDescription([
-        # ------ XRCE-Agent -------- #
+    DRONE_NUMBERS = 1
+
+    nodes_list = []
+    # ------ XRCE-Agent -------- #
+    nodes_list.append(
         launch.actions.ExecuteProcess(
         cmd=[[
             'MicroXRCEAgent ',
@@ -11,57 +14,34 @@ def generate_launch_description():
             '-p ',
             '8888'
         ]],
-        shell=True),
+        shell=True))
 
-        # ------- DRONE 2 ---------- #
-        launch_ros.actions.Node(
+    for i in range(1,DRONE_NUMBERS+1):
+        # ---- PILOT NODE --- #
+        nodes_list.append(
+            launch_ros.actions.Node(
             package='drone_tracker_py',
             executable='pilot',
-            name='pilot2',
+            namespace=f'/drone{i+1}',
+            name=f'pilot{i+1}',
             parameters=[
-                {'namespace':"drone2",
-                 'simulation':True}
-            ]),
-
-        launch_ros.actions.Node(
+                {'simulation':True}])
+        )
+        # ---- MOTION CAPTURE --- #
+        nodes_list.append(
+            launch_ros.actions.Node(
             package='drone_tracker_py',
             executable='mocap_gazebo',
-            name='mocap_node',
-            parameters=[
-                {'namespace':"drone2"}
-            ]),
-        
-        launch_ros.actions.Node(
+            name=f'mocap_node{i+1}',
+            namespace=f'/drone{i+1}')
+        )
+        # ---- CAMERA SIMULATION --- #
+        nodes_list.append(
+            launch_ros.actions.Node(
             package='drone_tracker_py',
             executable='camera_sim',
-            name='drone_tracker_py',
-            parameters=[
-                {'namespace':"drone2"}
-            ]),
+            name=f'drone_tracker_py{i+1}',
+            namespace=f'/drone{i+1}')
+        )
 
-        # ------- DRONE 3 ---------- #
-        launch_ros.actions.Node(
-            package='drone_tracker_py',
-            executable='pilot',
-            name='pilot3',
-            parameters=[
-                {'namespace':"drone3",
-                 'simulation':True}
-            ]),
-
-        launch_ros.actions.Node(
-            package='drone_tracker_py',
-            executable='mocap_gazebo',
-            name='mocap_node',
-            parameters=[
-                {'namespace':"drone3"}
-            ]),
-        
-        launch_ros.actions.Node(
-            package='drone_tracker_py',
-            executable='camera_sim',
-            name='drone_tracker_py',
-            parameters=[
-                {'namespace':"drone3"}
-            ])
-  ])
+    return launch.LaunchDescription(nodes_list)

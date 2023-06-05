@@ -23,12 +23,10 @@ class CameraSim(Node) :
 			history=QoSHistoryPolicy.KEEP_LAST,
 			depth=1
 		)
-		self.declare_parameter("namespace", "drone1")
-		self.namespace = self.get_parameter("namespace").get_parameter_value().string_value
 		self.bridge = CvBridge()
 		
-		self._image_sub = self.create_subscription(Image, '/'+self.namespace+"/camera/image_raw", self.update_last_frame, qos_profile)
-		self._marker_pub = self.create_publisher(ApriltagMarker, '/'+self.namespace+"/apriltag_info", qos_profile)
+		self._image_sub = self.create_subscription(Image, self.get_namespace()+"/camera/image_raw", self.update_last_frame, qos_profile)
+		self._marker_pub = self.create_publisher(ApriltagMarker, self.get_namespace()+"/apriltag_info", qos_profile)
 		self._detect_timer = self.create_timer(0.1, self._detect_marker)
 
 		self._last_frame : Image = None
@@ -45,7 +43,10 @@ class CameraSim(Node) :
 	def distance(self, pta, ptb) -> float:
 		return math.sqrt((pta[0]-ptb[1])**2 + (pta[1]-ptb[1])**2)
 
-	def _detect_marker(self):
+	def _detect_marker(self) -> None:
+		if not self._last_frame:
+			return
+		
 		image = self.bridge.imgmsg_to_cv2(self._last_frame, 'bgra8')
 		gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 		# gray = cv2.getRectSubPix(gray, [320, 240], [320, 240])
