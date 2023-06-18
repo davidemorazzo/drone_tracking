@@ -64,22 +64,15 @@ class CameraSim(Node) :
 			ptD = (int(ptD[0]), int(ptD[1]))
 			ptA = (int(ptA[0]), int(ptA[1]))
 			(cX, cY) = (int(r.center[0]), int(r.center[1]))
-
-			max_diag = max(
-				self.distance(ptA, ptB),
-				self.distance(ptA, ptC),
-				self.distance(ptA, ptD),
-				self.distance(ptB, ptC),
-				self.distance(ptB, ptD),
-				self.distance(ptC, ptD),			
-			)
 		
 			msg = ApriltagMarker()
-			msg.marker_id = r.tag_id
-			msg.marker_x = cX
-			msg.marker_y = cY
-			msg._marker_rot = max_diag / math.sqrt(2)
-			msg.marker_rect = self._rect
+			msg.id = r.tag_id
+			msg.center_x = cX
+			msg.center_y = cY
+			msg.corner_1 = [int(ptD[0]), int(ptD[1])]
+			msg.corner_2 = [int(ptC[0]), int(ptC[1])]
+			msg.corner_3 = [int(ptB[0]), int(ptB[1])]
+			msg.corner_4 = [int(ptA[0]), int(ptA[1])]
 			self._marker_pub.publish(msg)
 		
 		# cv2.imwrite("/home/judocero/Scrivania/drone_tracking/gray.png", gray)

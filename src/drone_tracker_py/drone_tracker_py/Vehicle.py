@@ -91,8 +91,8 @@ class Vehicle():
             self.vehicle_timesync_status = copy.copy(msg)
         elif isinstance(msg, ApriltagMarker): 
             self.camera.udpate_marker_pos(copy.copy(msg))
-            d = self.camera.marker_distance
-            self._attached_node.get_logger().info(f"Marker distance = {d}")
+            # d = self.camera.marker_distance
+            self._attached_node.get_logger().info(str(self.camera.corners))
         else:
             self._attached_node.get_logger().warning(f"Message unknown: {msg}")
 
@@ -156,4 +156,4 @@ class Vehicle():
     def get_marker_pos(self) -> tuple[float]:
         # TODO: da rivedere
         return self.camera.marker_3d_pos
-        pass
+    
