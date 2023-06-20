@@ -1,33 +1,47 @@
 cmake_minimum_required(VERSION 3.8)
 project(drone_tracker)
 
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+
+INCLUDE_DIRECTORIES ( "/usr/include/eigen3" )
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(px4_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
 
-add_executable(tracker 
-  src/tracker.cpp
-  src/vehicle.cpp
-  src/pilot.cpp)
+# add_executable(tracker 
+#   src/tracker.cpp
+#   src/vehicle.cpp
+#   src/pilot.cpp)
 
 
-ament_target_dependencies(tracker px4_msgs rclcpp)
-target_include_directories(tracker PUBLIC
+# ament_target_dependencies(tracker px4_msgs rclcpp)
+# target_include_directories(tracker PUBLIC
+# $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+# $<INSTALL_INTERFACE:include>)
+# target_compile_features(tracker PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+
+add_executable(estimator
+  src/EASN_estimation.cpp)
+ament_target_dependencies(estimator px4_msgs rclcpp std_msgs geometry_msgs)
+
+target_include_directories(estimator PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(tracker PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(estimator PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS tracker
+install(TARGETS estimator
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
