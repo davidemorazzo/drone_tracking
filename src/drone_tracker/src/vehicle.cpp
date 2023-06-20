@@ -4,12 +4,15 @@
 using namespace px4_msgs::msg;
 using std::placeholders::_1;
 
-Vehicle::Vehicle(std::string ros_namespace, rclcpp::Node::SharedPtr attached_node){
-	this->ros_namespace = ros_namespace;
-	this->attached_node = attached_node;
+Vehicle::Vehicle() : Node("vehicle_node"){
+	if (std::string(this->get_namespace()) == "/"){
+		this->ros_namespace = "";
+	}else{
+		this->ros_namespace = this->get_namespace();
+	}
 	
 	/*Offboard control mode message*/
-	this->offboard_control_mode = OffboardControlMode::SharedPtr();
+	this->offboard_control_mode = std::make_shared<OffboardControlMode>();
 	this->offboard_control_mode->timestamp = this->get_now_timestamp();
 	this->offboard_control_mode->body_rate = false;
 	this->offboard_control_mode->attitude = false;
@@ -18,25 +21,25 @@ Vehicle::Vehicle(std::string ros_namespace, rclcpp::Node::SharedPtr attached_nod
 	this->offboard_control_mode->acceleration = false;
 
 	/*Creating publishers*/
-	this->vehicle_command_pub = this->attached_node->create_publisher<VehicleCommand>(
+	this->vehicle_command_pub = this->create_publisher<VehicleCommand>(
 		std::string(this->ros_namespace + "/fmu/in/vehicle_command"), 10);
-	this->offboard_control_mode_pub = this->attached_node->create_publisher<OffboardControlMode>(
+	this->offboard_control_mode_pub = this->create_publisher<OffboardControlMode>(
 		std::string(this->ros_namespace + "/fmu/in/offboard_control_mode"), 10);
 	/*Creating subscriptions*/
-	this->vehicle_status_sub = this->attached_node->create_subscription<VehicleStatus>(
+	this->vehicle_status_sub = this->create_subscription<VehicleStatus>(
 		std::string(this->ros_namespace + "/fmu/out/vehicle_status"), 10, 
 		std::bind(& Vehicle::vehicle_status_cb, this, _1));
-	this->vehicle_attitude_sub = this->attached_node->create_subscription<VehicleAttitude>(
-		std::string(this->ros_namespace + "/fmu/out/vehicle_attitude"), 10, 
-		std::bind(& Vehicle::vehicle_attitude_cb, this, _1));
-	this->vehicle_control_mode_sub = this->attached_node->create_subscription<VehicleControlMode>(
+	this->vehicle_control_mode_sub = this->create_subscription<VehicleControlMode>(
 		std::string(this->ros_namespace + "/fmu/out/vehicle_control_mode"), 10, 
 		std::bind(& Vehicle::vehicle_control_mode_cb, this, _1));
-	this->timesync_status_sub = this->attached_node->create_subscription<TimesyncStatus>(
+	this->timesync_status_sub = this->create_subscription<TimesyncStatus>(
 		std::string(this->ros_namespace + "/fmu/out/timesync_status"), 10, 
 		std::bind(& Vehicle::timesync_status_cb, this, _1));
-	
-	RCLCPP_INFO(this->attached_node->get_logger(), "Vehicle initialized");
+
+	this->current_state = MissionState::IDLE;
+	this->next_state = MissionState::IDLE;
+
+	RCLCPP_INFO(this->get_logger(), "Vehicle initialized");
 }
 
 void Vehicle::send_arm_command(){
@@ -57,13 +60,13 @@ VehicleCommand Vehicle::create_vehicle_command(int command, float param1, float 
 	auto msg = VehicleCommand();
 	msg.param1 = param1;
 	msg.param2 = param2;
-	msg.command = command;  // command ID
-	msg.target_system = this->system_id();  // system which should execute the command
-	msg.target_component = this->component_id(); // component which should execute the command, 0 for all components
-	msg.source_system = 10; // system sending the command
-	msg.source_component = 1; // component sending the command
+	msg.command = command;  					// command ID
+	msg.target_system = this->system_id();  	// system which should execute the command
+	msg.target_component = this->component_id();// component which should execute the command, 0 for all components
+	msg.source_system = 10; 					// system sending the command
+	msg.source_component = 1; 					// component sending the command
 	msg.from_external = true;
-	msg.timestamp = this->get_now_timestamp(); // time in microseconds
+	msg.timestamp = this->get_now_timestamp(); 	// time in microseconds
 	return msg;
 }
 
@@ -82,4 +85,75 @@ void Vehicle::publish_offboard_control_signal(){
 
 void Vehicle::publish_trajectory_setpoint(px4_msgs::msg::TrajectorySetpoint message){
 	this->trajectory_setpoint_pub->publish(message);
+}
+
+bool Vehicle::xrce_connected(){
+	return this->vehicle_status != nullptr and
+		this->vehicle_control_mode != nullptr and
+		this->timesync_status != nullptr;
+}
+
+void Vehicle::mission_update(){
+
+	if (!this->xrce_connected()){return;}
+	
+	current_state = next_state;
+
+	switch(current_state){
+		case IDLE:
+			if(this->nav_state() == VehicleStatus::NAVIGATION_STATE_OFFBOARD){
+				RCLCPP_INFO(this->get_logger(), "IDLE=>PREFLIGHT_CHECK");
+				next_state = MissionState::PREFLIGHT_CHECK;
+			}else{
+				this->offboard_flight_mode(); /*Set offboard flight mode*/
+				next_state = MissionState::IDLE;
+			}
+			break;
+		//-----------------------------------------------------
+		case PREFLIGHT_CHECK:
+			if(this->preflight_check())	{
+				next_state = MissionState::ARMING;
+				RCLCPP_INFO(this->get_logger(), "PREFLIGHT_CHECK=>ARMING");}
+			else {next_state = MissionState::PREFLIGHT_CHECK;}
+		break;
+		//-----------------------------------------------------
+		case ARMING:
+			this->send_arm_command();
+			next_state = MissionState::ARMED;
+			RCLCPP_INFO(this->get_logger(), "ARMING=>ARMED");
+			break;
+		//-----------------------------------------------------
+		case ARMED:
+			if(this->is_armed()){
+				next_state = MissionState::MISSION;
+				RCLCPP_INFO(this->get_logger(), "ARMED=>MISSION");}
+			else{next_state = MissionState::ARMED;}
+			break;
+		//-----------------------------------------------------
+		case MISSION:
+			if(this->mission_func()){next_state = MissionState::LANDING;}
+			else{next_state = MissionState::MISSION;}
+			break;
+		//-----------------------------------------------------
+		case LANDING:
+			break;
+		//-----------------------------------------------------
+		case FAILSAFE:
+			break;
+
+		
+		default:
+			next_state = MissionState::IDLE;
+			break;
+	}
+
+}
+
+bool Vehicle::mission_func(){
+	TrajectorySetpoint msg = TrajectorySetpoint();
+	msg.position = {0.0 , 0.0, -4.0};
+	msg.timestamp = this->get_now_timestamp();
+	msg.yaw = 3.14/2.0;
+	this->publish_trajectory_setpoint(msg);
+	return true;
 }

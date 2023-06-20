@@ -18,20 +18,17 @@ find_package(geometry_msgs REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
+############## VEHICLE NODE ######################
+add_executable(vehicle 
+  src/vehicle.cpp)
 
-# add_executable(tracker 
-#   src/tracker.cpp
-#   src/vehicle.cpp
-#   src/pilot.cpp)
+ament_target_dependencies(vehicle px4_msgs rclcpp)
+target_include_directories(vehicle PUBLIC
+$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+$<INSTALL_INTERFACE:include>)
+target_compile_features(vehicle PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-
-# ament_target_dependencies(tracker px4_msgs rclcpp)
-# target_include_directories(tracker PUBLIC
-# $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-# $<INSTALL_INTERFACE:include>)
-# target_compile_features(tracker PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-
-
+#############  ESTIMATOR NODE #####################
 add_executable(estimator
   src/EASN_estimation.cpp)
 ament_target_dependencies(estimator px4_msgs rclcpp std_msgs geometry_msgs)
@@ -41,7 +38,7 @@ target_include_directories(estimator PUBLIC
   $<INSTALL_INTERFACE:include>)
 target_compile_features(estimator PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS estimator
+install(TARGETS estimator vehicle
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
