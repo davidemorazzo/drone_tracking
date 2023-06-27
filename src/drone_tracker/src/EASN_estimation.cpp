@@ -25,8 +25,17 @@ class EASN_estimation : public rclcpp::Node
 {
 public:
 	EASN_estimation() : Node("EASN_estimation"){
-		
+
+		// Declare parameters to parametrize the node
+		this->declare_parameter("self_id", "0");
+		this->declare_parameter("nA_id", "1");
+		this->declare_parameter("nB_id", "2");
+		this->me = this->get_parameter("self_id").get_parameter_value().get<std::string>();
+		this->nA = this->get_parameter("nA_id").get_parameter_value().get<std::string>();
+		this->nB = this->get_parameter("nB_id").get_parameter_value().get<std::string>();
+			
 		this->generate_subscribers();
+		this->generate_publishers();
 
 		// Variable initialization
 		this->lambda = {0, 0, 0, 0};     
@@ -79,10 +88,9 @@ public:
 
 	/*Estimation algorithm. At the end publish the information and estimation topics*/
 	void estimation(){
-		if(prev_time!=0){
 			// the estimation algorithm needs the precise DT in matrix F to properly estimate the target's velocity.
-			F  << 1,0,DT,0,
-					0,1,0,DT, 
+			F  << 1,0,this->measured_DT,0,
+					0,1,0,this->measured_DT, 
 					0,0,1,0, 
 					0,0,0,1;
 			
@@ -102,7 +110,9 @@ public:
 			
 			h_meas << sqrt(pow(X,2)+pow(Y,2)), atan2(Y,X) ; // compute h_i to use in eq. (17) of EASN
 			
-			z_meas << rho_theta.data[2*std::stoi(me)], rho_theta.data[2*std::stoi(me)+1]; //get the actual measurement from the sensor
+			//get the actual measurement from the sensor
+			// z_meas << rho_theta.data[2*std::stoi(me)], rho_theta.data[2*std::stoi(me)+1]; 
+			z_meas << this->last_sensor_info.data[0], this->last_sensor_info.data[1];
 					
 			// eq. (17) of EASN    	
 			I_meas = grad_h.transpose()*R.inverse()*grad_h;    	      
@@ -156,42 +166,39 @@ public:
 			
 			/* in rho_theta.data[6] we find the time instant in which 
 			the last measurement was performed. This is crucial to obtain precise velocity estimate. */
-			prev_time = rho_theta.data[6];
+			// prev_time = rho_theta.data[6];
+			// prev_time = this->last_sensor_info.data[3];
 			
-		}
 	};
 	
 	/*Flocking Algorithm*/
 	void compute_flocking_cmd(){	
 		///////////////////////////////   FLOCKING ALGORITHM   ////////////////////////////////////
-		/* ----------GPS coordinate transformation not needed --------
 
-		// transform the longitudes from degrees to rad
-		lambda[std::stoi(self)] = self_state_global.longitude * M_PI/180;
-		lambda[std::stoi(nA)] = neigh_stateA.longitude * M_PI/180;
-		lambda[std::stoi(nB)] = neigh_stateB.longitude * M_PI/180;
-		// transform the latitudes from degrees to rad
-		phi[std::stoi(self)] = self_state_global.latitude* M_PI/180;
-		phi[std::stoi(nA)] = neigh_stateA.latitude * M_PI/180;
-		phi[std::stoi(nB)] = neigh_stateB.latitude * M_PI/180; 
-		--------------------------------------------------------------*/
+		// FIXME: possibile errore tra scambio di X e Y
+		// lambda is the X coordinate (lo spero...) 
+		lambda[std::stoi(me)] = this->self_odom.position[0];
+		lambda[std::stoi(nA)] = this->nA_odom.position[0];
+		lambda[std::stoi(nB)] = this->nB_odom.position[0];
+		// phi is the y coordinate (lo spero parte 2 ...)
+		phi[std::stoi(me)] = this->self_odom.position[1];
+		phi[std::stoi(nA)] = this->nA_odom.position[1];
+		phi[std::stoi(nB)] = this->nB_odom.position[1];
 			
-
 				
 		for (int i = 0; i < 3; ++i){
 		
 			if( i != std::stoi(me)){
-				/* ----------- Recompute with rectangular coordinates ----------------------
+				// Relative distance from "me" to drone i-th
+				double diff_vec[3] = {
+					this->self_odom.position[0] - this->lambda[i],
+					this->self_odom.position[0] - this->lambda[i],
+					this->self_odom.position[0] - this->lambda[i]
+				};
 
-				// compute relative distance through Haversine formula (eq. (13) of ICUAS), and then compute relative x and y positions with respect to neighbors UAVs	 
-				dist[i] = 2*R_E*asin(sqrt(pow(sin((phi[i]-phi[me])/2),2) + cos(phi[me])*cos(phi[i])*pow(sin((lambda[i]-lambda[me])/2),2)));
-				dist_phi[i] = sign(phi[i]-phi[me])*2*R_E*asin(sqrt(pow(sin((phi[i]-phi[me])/2),2)));
-				dist_lambda[i] = sign(lambda[i]-lambda[me])*sqrt(pow(dist[i],2) - pow(dist_phi[i],2));
-				----------------------------------------------------------------------------*/
-				// TODO: da fare
-				dist[i] = 0;
-				dist_phi[i] = 0;
-				dist_lambda[i] = 0;
+				dist[i] = this->vector3_norm(diff_vec);
+				dist_phi[i] = this->phi[std::stoi(me)] - this->phi[i];				// FIXME: la distanza deve avere segno o no?
+				dist_lambda[i] = this->lambda[std::stoi(me)] - this->lambda[i];		// FIXME: la distanza deve avere segno o no?
 				
 				//compute distance regulator input + integral action on the relative distance --> eq(3) + eq. (8) of EASN
 				u_alpha[i] = (rho_p(sigma_norm(dist[i])/sigma_norm(4.8))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(4)) + k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
@@ -204,13 +211,13 @@ public:
 		
 		//compute x component of eq. (5) in EASN    
 		u_vx = -(this->self_odom.velocity[0] - this->nA_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(4.8)) 
-				- (this->self_odom.velocity[0] - this->nB_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8)); 
+			   -(this->self_odom.velocity[0] - this->nB_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8)); 
 		//compute y component of eq. (5) in EASN 
 		u_vy = -(this->self_odom.velocity[1] - this->nA_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(4.8))
-				 - (this->self_odom.velocity[1] - this->nB_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8));
+			   -(this->self_odom.velocity[1] - this->nB_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8));
 			
 	
-		// compute relative distance and relative x and y positions between UAV and target
+		// compute relative distance and relative x and y positions between UAV and TARGET
 		dist_lambda[3] = x_est(0) - (this->self_odom.position[0] + x0[std::stoi(me)]);
 		dist_phi[3] =    x_est(1) - (this->self_odom.position[1] + y0[std::stoi(me)]);
 		dist[3] = sqrt(pow(x_est(0) - (this->self_odom.position[0] + x0[std::stoi(me)]),2) + 
@@ -223,12 +230,14 @@ public:
 		
 		
 		//compute control input along x axis
-		cmd_force_x = 0.25 * (u_x[std::stoi(nA)]+u_x[std::stoi(nB)]
+		this->cmd_force_x = 
+				0.25 * (u_x[std::stoi(nA)]+u_x[std::stoi(nB)]
 				+ k_d*u_vx + k_abs*(c_1*dist_lambda[3]*rho_int(dist[3]/d_int)
 				+ c_2*(x_est(2)-this->self_odom.velocity[0]) + c_int*e_vx_0t)); 
 		
 		//compute control input along y axis
-		cmd_force_y = 0.25 * (u_y[std::stoi(nA)]+u_y[std::stoi(nB)]
+		this->cmd_force_y = 
+				0.25 * (u_y[std::stoi(nA)]+u_y[std::stoi(nB)]
 				+ k_d*u_vy + k_abs*(c_1*dist_phi[3]*rho_int(dist[3]/d_int) 
 				+ c_2*(x_est(3)-this->self_odom.velocity[1])  + c_int*e_vy_0t));
 		
@@ -262,26 +271,32 @@ public:
 	double get_force_y(){return this->cmd_force_y;}
 
 private:
-	/*----------------------- ROS 2 COMMUNICATION ----------------------*/
+	/* -------------------------------------------------------------------------------*/
+	/*---------------------------- ROS 2 COMMUNICATION -------------------------------*/
 
-	std_msgs::msg::Float64MultiArray rho_theta;
+	// std_msgs::msg::Float64MultiArray rho_theta;
 
-	std::string me = "1";
-	std::string nA = "2";
-	std::string nB = "3";
+	std::string me = "0";
+	std::string nA = "1";
+	std::string nB = "2";
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr self_odometry_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr nA_odometry_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr nB_odometry_sub;
-	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_info_pub;
-	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_estimate_pub;
 	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr nA_info_sub;
 	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr nB_info_sub;
+	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr sensor_sub;
+
+	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_info_pub;
+	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_estimate_pub;
+	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr drone_command_pub;
 
 	px4_msgs::msg::VehicleOdometry nA_odom, nB_odom, self_odom;
 	std_msgs::msg::Float64MultiArray info_nA, info_nB, self_info;
 	std_msgs::msg::Float64MultiArray my_est;
+	std_msgs::msg::Float64MultiArray last_sensor_info;
 
 	void generate_subscribers(){
+		/* Odometry topics */
 		this->self_odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
 			"/drone" + this->me + "/fmu/out/vehicle_odometry", 10,
 			std::bind(& EASN_estimation::self_odom_cb, this, _1)); 
@@ -290,9 +305,12 @@ private:
 			std::bind(& EASN_estimation::nA_odom_cb, this, _1)); 
 		this->nB_odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
 			"/drone" + this->nB + "/fmu/out/vehicle_odometry", 10,
-			std::bind(& EASN_estimation::nB_odom_cb, this, _1)); 
+			std::bind(& EASN_estimation::nB_odom_cb, this, _1));
+		this->sensor_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+			"/drone" + this->me + "/sensor_measure", 10,
+			std::bind(& EASN_estimation::sensor_cb, this, _1)); 
 		
-		
+		/* Estimator topics */
 		this->nA_info_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
 			"/drone" + this->nA + "/information", 10,
 			std::bind(& EASN_estimation::nA_info_cb, this, _1)); 
@@ -304,15 +322,35 @@ private:
 	void generate_publishers(){
 		this->self_info_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + this->me + "/information", 10);
 		this->self_estimate_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + this->me + "/estimation", 10);
+		this->drone_command_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + this->me + "/acceleration_cmd",10);
 	}
 
 	void self_odom_cb(const px4_msgs::msg::VehicleOdometry msg){this->self_odom = msg;};
 	void nA_odom_cb(const px4_msgs::msg::VehicleOdometry msg){this->nA_odom = msg;};
 	void nB_odom_cb(const px4_msgs::msg::VehicleOdometry msg){this->nB_odom = msg;};
 	
-	void self_info_cb(const std_msgs::msg::Float64MultiArray msg){this->self_info = msg;};
 	void nA_info_cb(const std_msgs::msg::Float64MultiArray msg){this->info_nA = msg;};
 	void nB_info_cb(const std_msgs::msg::Float64MultiArray msg){this->info_nB = msg;};
+
+	/* Execute the estimation and compute the flocking command each time a new sensor 
+		message is available */
+	void sensor_cb(const std_msgs::msg::Float64MultiArray msg){
+		// Calculate DT in seconds
+		this->measured_DT = this->last_sensor_info.data[3] - msg.data[3];
+		this->last_sensor_info = msg;
+
+		// Do estimation
+		this->estimation();
+		this->compute_flocking_cmd();
+
+		// Publish acceleration command 
+		std_msgs::msg::Float64MultiArray acc_msg;
+		acc_msg.data.clear();
+		acc_msg.data.push_back(this->cmd_force_x);
+		acc_msg.data.push_back(this->cmd_force_y);
+		this->drone_command_pub->publish(acc_msg);
+
+	}	
 	/* -------------------------------------------------------------------------------*/
 	/*-------------------------- ESTIMATION VARIABLES --------------------------------*/
 
@@ -334,7 +372,8 @@ private:
 	Vector2d z_meas, h_meas;
 	int n = 4, k_abs = 0, count = 0 ;
     double X, Y;
-    double prev_time = 0;
+    // double prev_time = 0;
+	double measured_DT;			// [s] seconds between 2 sensor measurements measured from timestamp
 
 	/*-----------------------------------------------------------------------*/
 	/*----------------- REGULATOR VARIABLES ---------------------------------*/
@@ -349,12 +388,23 @@ private:
 	double c_int = 0.05;
 	double d_int = 3; 
 
-	std::vector<double> lambda, phi, dist, dist_phi, dist_lambda;
+	std::vector<double> lambda;			// [rad] latitude
+	std::vector<double> phi;			// [rad] longitude
+	std::vector<double> dist; 			// [m] relative distance to other drones and target
+	std::vector<double> dist_phi;
+	std::vector<double> dist_lambda;
 	std::vector<double> u_alpha, u_x, u_y, e_r;
-	double cmd_force_x = 0, 	// [m/s^2] x acceleration command for the drone
-			cmd_force_y = 0;	// [m/s^2] y acceleration command for the drone
+	double cmd_force_x = 0, 			// [m/s^2] x acceleration command for the drone
+			cmd_force_y = 0;			// [m/s^2] y acceleration command for the drone
 	
 	/*----------------------------------------------------------------------*/
+	double vector3_norm(double vector[3]){
+		return sqrt(
+			pow(vector[0],2)+
+			pow(vector[1],2)+
+			pow(vector[2],2)
+		);
+	}
 
 	double sigma_norm(double dist){
 		double r , eps = 0.1; 
@@ -409,6 +459,9 @@ private:
 
 
 
-int main(){
-
+int main(int argc, char **argv){
+	rclcpp::init(argc, argv);
+	rclcpp::spin(std::make_shared<EASN_estimation>());
+	rclcpp::shutdown();
+	return 0;
 }

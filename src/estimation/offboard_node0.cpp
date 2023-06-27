@@ -1,21 +1,17 @@
-// #include <ros/ros.h>
-// #include <rosgraph_msgs/TopicStatistics.h>
-// #include <mavros_msgs/CommandBool.h>
-// #include <mavros_msgs/SetMode.h>
-// #include <mavros_msgs/State.h>
-// #include <mavros_msgs/PositionTarget.h>
-
-/* ROS MSGS */
+#include <ros/ros.h>
+#include <rosgraph_msgs/TopicStatistics.h>
 #include <sensor_msgs/NavSatFix.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/SetMode.h>
+#include <mavros_msgs/State.h>
 #include <std_msgs/Float64MultiArray.h>
+#include <mavros_msgs/PositionTarget.h>
 #include <std_msgs/Bool.h>
-#include <std_msgs/Float64MultiArray.h>
-
-/* STD LIBRARIES */
 #include <stdio.h>
 #include <math.h>
+#include <std_msgs/Float64MultiArray.h>
 #include <bits/stdc++.h>
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -37,7 +33,7 @@ void state_cb(const mavros_msgs::State::ConstPtr& msg){
 void self_state_global_cb(const sensor_msgs::NavSatFix::ConstPtr& msg){
     self_state_global = *msg;
 }
- sensor_msgs::NavSatFix self_state_global;
+ geometry_msgs::PoseStamped self_state_local;
 void self_state_local_cb(const geometry_msgs::PoseStamped::ConstPtr& msg){
     self_state_local = *msg;
 }
@@ -143,70 +139,70 @@ int sign(double val){
  
  
  
-int mamimic_sensor_cbin(int argc, char **argv)
+int main(int argc, char **argv)
 {
-    // ros::init(argc, argv, "offb_node" + self);
-    // ros::NodeHandle nh;    
+    ros::init(argc, argv, "offb_node" + self);
+    ros::NodeHandle nh;    
     
-    // ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>
-    //         ("uav" + self + "/mavros/state", 10, state_cb);
-    // ros::Subscriber self_state_global_sub = nh.subscribe<sensor_msgs::NavSatFix>
-    //         ("uav" + self + "/mavros/global_position/global", 10, self_state_global_cb); 
-    // ros::Subscriber self_state_local_sub = nh.subscribe<geometry_msgs::PoseStamped>
-    //         ("uav" + self + "/mavros/local_position/pose", 10, self_state_local_cb);            
-    // ros::Subscriber self_vel_sub = nh.subscribe<geometry_msgs::TwistStamped>
-    //         ("uav" + self + "/mavros/local_position/velocity_local", 10, self_vel_cb);   
+    ros::Subscriber state_sub = nh.subscribe<mavros_msgs::State>
+            ("uav" + self + "/mavros/state", 10, state_cb);
+    ros::Subscriber self_state_global_sub = nh.subscribe<sensor_msgs::NavSatFix>
+            ("uav" + self + "/mavros/global_position/global", 10, self_state_global_cb); 
+    ros::Subscriber self_state_local_sub = nh.subscribe<geometry_msgs::PoseStamped>
+            ("uav" + self + "/mavros/local_position/pose", 10, self_state_local_cb);            
+    ros::Subscriber self_vel_sub = nh.subscribe<geometry_msgs::TwistStamped>
+            ("uav" + self + "/mavros/local_position/velocity_local", 10, self_vel_cb);   
             
-    // ros::Subscriber neigh_state_subA = nh.subscribe<sensor_msgs::NavSatFix>
-    //         ("uav" + nA + "/offb/global", 10, neigh_state_cbA); 
-    // ros::Subscriber neigh_state_subB = nh.subscribe<sensor_msgs::NavSatFix>
-    //         ("uav" + nB + "/offb/global", 10, neigh_state_cbB);
-    // ros::Subscriber neigh_vel_subA = nh.subscribe<geometry_msgs::TwistStamped>
-    //         ("uav" + nA + "/offb/vel", 10, neigh_vel_cbA); 
-    // ros::Subscriber neigh_vel_subB = nh.subscribe<geometry_msgs::TwistStamped>
-    //         ("uav" + nB + "/offb/vel", 10, neigh_vel_cbB);   
-    // ros::Subscriber information_subA = nh.subscribe<std_msgs::Float64MultiArray>
-    //         ("uav" + nA + "/information", 10, info_nA_cb);
-    // ros::Subscriber information_subB = nh.subscribe<std_msgs::Float64MultiArray>
-    //         ("uav" + nB + "/information", 10, info_nB_cb);           
+    ros::Subscriber neigh_state_subA = nh.subscribe<sensor_msgs::NavSatFix>
+            ("uav" + nA + "/offb/global", 10, neigh_state_cbA); 
+    ros::Subscriber neigh_state_subB = nh.subscribe<sensor_msgs::NavSatFix>
+            ("uav" + nB + "/offb/global", 10, neigh_state_cbB);
+    ros::Subscriber neigh_vel_subA = nh.subscribe<geometry_msgs::TwistStamped>
+            ("uav" + nA + "/offb/vel", 10, neigh_vel_cbA); 
+    ros::Subscriber neigh_vel_subB = nh.subscribe<geometry_msgs::TwistStamped>
+            ("uav" + nB + "/offb/vel", 10, neigh_vel_cbB);   
+    ros::Subscriber information_subA = nh.subscribe<std_msgs::Float64MultiArray>
+            ("uav" + nA + "/information", 10, info_nA_cb);
+    ros::Subscriber information_subB = nh.subscribe<std_msgs::Float64MultiArray>
+            ("uav" + nB + "/information", 10, info_nB_cb);           
                           
       
-    // ros::Subscriber mimic_sensor_sub = nh.subscribe<std_msgs::Float64MultiArray>
-    //         ("target/mimic_sensor", 10, mimic_sensor_cb);
-    // ros::Subscriber target_start_sub = nh.subscribe<std_msgs::Bool>
-    //         ("target/start_flag", 10, target_start_cb);              
+    ros::Subscriber mimic_sensor_sub = nh.subscribe<std_msgs::Float64MultiArray>
+            ("target/mimic_sensor", 10, mimic_sensor_cb);
+    ros::Subscriber target_start_sub = nh.subscribe<std_msgs::Bool>
+            ("target/start_flag", 10, target_start_cb);              
                          
-    // ros::Publisher local_pos_pub = nh.advertise<geometry_msgs::PoseStamped>
-    //         ("uav" + self + "/mavros/setpoint_position/local", 10);
-    // ros::Publisher raw_pub = nh.advertise<mavros_msgs::PositionTarget>
-    //         ("uav" + self + "/mavros/setpoint_raw/local", 10); 
+    ros::Publisher local_pos_pub = nh.advertise<geometry_msgs::PoseStamped>
+            ("uav" + self + "/mavros/setpoint_position/local", 10);
+    ros::Publisher raw_pub = nh.advertise<mavros_msgs::PositionTarget>
+            ("uav" + self + "/mavros/setpoint_raw/local", 10); 
             
-    // ros::Publisher information_pub = nh.advertise<std_msgs::Float64MultiArray>
-    //         ("uav" + self + "/information", 10);
-    // ros::Publisher estimation_pub = nh.advertise<std_msgs::Float64MultiArray>
-    //         ("uav" + self + "/estimation", 10);
-    // ros::Publisher my_global = nh.advertise<sensor_msgs::NavSatFix>
-    //         ("uav" + self + "/offb/global", 10); 
-    // ros::Publisher my_vel = nh.advertise<geometry_msgs::TwistStamped>
-    //         ("uav" + self + "/offb/vel", 10);                           
-    // ros::Publisher distances = nh.advertise<geometry_msgs::PoseStamped>
-    //         ("uav" + self + "/chatter", 10);  
+    ros::Publisher information_pub = nh.advertise<std_msgs::Float64MultiArray>
+            ("uav" + self + "/information", 10);
+    ros::Publisher estimation_pub = nh.advertise<std_msgs::Float64MultiArray>
+            ("uav" + self + "/estimation", 10);
+    ros::Publisher my_global = nh.advertise<sensor_msgs::NavSatFix>
+            ("uav" + self + "/offb/global", 10); 
+    ros::Publisher my_vel = nh.advertise<geometry_msgs::TwistStamped>
+            ("uav" + self + "/offb/vel", 10);                           
+    ros::Publisher distances = nh.advertise<geometry_msgs::PoseStamped>
+            ("uav" + self + "/chatter", 10);  
                   
-    // ros::ServiceClient arming_client = nh.serviceClient<mavros_msgs::CommandBool>
-    //         ("uav" + self + "/mavros/cmd/arming");
-    // ros::ServiceClient set_mode_client = nh.serviceClient<mavros_msgs::SetMode>
-    //         ("uav" + self + "/mavros/set_mode");
+    ros::ServiceClient arming_client = nh.serviceClient<mavros_msgs::CommandBool>
+            ("uav" + self + "/mavros/cmd/arming");
+    ros::ServiceClient set_mode_client = nh.serviceClient<mavros_msgs::SetMode>
+            ("uav" + self + "/mavros/set_mode");
             
             
  
     //the setpoint publishing rate MUST be faster than 2Hz
-    // ros::Rate rate(20.0);
+    ros::Rate rate(20.0);
  
     // wait for FCU connection
-    // while(ros::ok() && !current_state.connected){
-    //     ros::spinOnce();
-    //     rate.sleep();
-    // }
+    while(ros::ok() && !current_state.connected){
+        ros::spinOnce();
+        rate.sleep();
+    }
     
 
     geometry_msgs::PoseStamped dist_plot;     
@@ -234,14 +230,7 @@ int mamimic_sensor_cbin(int argc, char **argv)
     double e_vx_0t = 0, e_vy_0t= 0, u_vx, u_vy, x0[3] = {3, 2, -2}, y0[3] = {4, -2, 1}, DT = 0.05;
     
     // Control parameters, tuned for good performances
-    double R_E = 6371008.7714;
-	double k_I= 0.001;
-	double k_P = 1;
-	double k_d = 2;
-	double c_1 = 0.5;
-	double c_2 = 0.75;
-	double c_int = 0.05;
-	double d_int = 3; // c_1 = 0.75 // k_I= 0.001 , k_P = 1, k_d = 0.5, c_1 = 0.5, c_2 = 0.1, c_int = 0.075   
+    double R_E = 6371008.7714, k_I= 0.001 , k_P = 1, k_d = 2, c_1 = 0.5, c_2 = 0.75, c_int = 0.05, d_int = 3; // c_1 = 0.75 // k_I= 0.001 , k_P = 1, k_d = 0.5, c_1 = 0.5, c_2 = 0.1, c_int = 0.075   
        
     Matrix4d Y_pred, Y_est, F, Q, P_pred, I_meas, I_meas_nA, I_meas_nB;
     
@@ -294,44 +283,44 @@ int mamimic_sensor_cbin(int argc, char **argv)
     std_msgs::Float64MultiArray my_info, my_est;
     
  
-    // //send a few setpoints before starting
-    // for(int i = 100; ros::ok() && i > 0; --i){
-    //     local_pos_pub.publish(self_pose);
-    //     ros::spinOnce();
-    //     rate.sleep();    
-    // }
+    //send a few setpoints before starting
+    for(int i = 100; ros::ok() && i > 0; --i){
+        local_pos_pub.publish(self_pose);
+        ros::spinOnce();
+        rate.sleep();    
+    }
  
-    // mavros_msgs::SetMode offb_set_mode;
-    // offb_set_mode.request.custom_mode = "OFFBOARD";
+    mavros_msgs::SetMode offb_set_mode;
+    offb_set_mode.request.custom_mode = "OFFBOARD";
  
-    // mavros_msgs::CommandBool arm_cmd;
-    // arm_cmd.request.value = true;
+    mavros_msgs::CommandBool arm_cmd;
+    arm_cmd.request.value = true;
  
-    // ros::Time last_request = ros::Time::now();
+    ros::Time last_request = ros::Time::now();
 
  
-    // while(ros::ok()){
-    //     if( current_state.mode != "OFFBOARD" && 
-    //         (ros::Time::now() - last_request > ros::Duration(5.0))){
-    //         if( set_mode_client.call(offb_set_mode) && 
-    //             offb_set_mode.response.mode_sent){
-    //             ROS_INFO("Enabling Offboard");
-    //         }
-    //         last_request = ros::Time::now();
-    //     } else {
-    //         if( !current_state.armed && 
-    //             (ros::Time::now() - last_request > ros::Duration(5.0))){
-    //             if( arming_client.call(arm_cmd) && 
-    //                 arm_cmd.response.success){
-    //                 ROS_INFO("Vehicle armed");
-    //             }
-    //             last_request = ros::Time::now();
-    //         }
-    //     } 
+    while(ros::ok()){
+        if( current_state.mode != "OFFBOARD" && 
+            (ros::Time::now() - last_request > ros::Duration(5.0))){
+            if( set_mode_client.call(offb_set_mode) && 
+                offb_set_mode.response.mode_sent){
+                ROS_INFO("Enabling Offboard");
+            }
+            last_request = ros::Time::now();
+        } else {
+            if( !current_state.armed && 
+                (ros::Time::now() - last_request > ros::Duration(5.0))){
+                if( arming_client.call(arm_cmd) && 
+                    arm_cmd.response.success){
+                    ROS_INFO("Vehicle armed");
+                }
+                last_request = ros::Time::now();
+            }
+        } 
         
            
        // the start_flag is provided by the target node. The algorithm starts 10 seconds after the UAVs have reached the desired altitude.    	
-if(start_flag.data == 1){ 
+       if(start_flag.data == 1){ 
        
               if(prev_time!=0){
        // the estimation algorithm needs the precise DT in matrix F to properly estimate the target's velocity.
@@ -485,17 +474,17 @@ if(start_flag.data == 1){
         dist_plot.pose.orientation.w = x_est(3);*/
         	
 
-        // raw_pub.publish(cmd_raw);
-        // }
-        // else {local_pos_pub.publish(self_pose);}
+        raw_pub.publish(cmd_raw);
+        }
+        else {local_pos_pub.publish(self_pose);}
         
         
-        // my_global.publish(self_state_global);
-        // my_vel.publish(self_vel);        
-        // distances.publish(dist_plot);
+        my_global.publish(self_state_global);
+        my_vel.publish(self_vel);        
+        distances.publish(dist_plot);
 	 
-        // ros::spinOnce();
-        // rate.sleep();
+        ros::spinOnce();
+        rate.sleep();
     }
  
     return 0;
