@@ -17,6 +17,7 @@ using namespace px4_msgs::msg;
 using namespace std::chrono_literals;
 
 enum MissionState {
+	NOT_CONNECTED,
 	IDLE,
 	PREFLIGHT_CHECK,
 	ARMING,

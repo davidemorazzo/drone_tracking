@@ -360,8 +360,8 @@ private:
 	  estimation algorithm (DT = 0.05 s = 1/20 Hz) */
 	double e_vx_0t, e_vy_0t, u_vx, 
 		u_vy, 
-		x0[3] = {3, 2, -2}, 	// [m] x startying points of drones, used as local origin for the drone
-		y0[3] = {4, -2, 1}, 	// [m] y starting point of drones, used as local origin for the drone
+		x0[3] = {3, 2, -2}, 	// [m] x starting points of drones, used as local origin for the drone
+		y0[3] = {4, -2, 1}, 	// [m] y starting points of drones, used as local origin for the drone
 		DT;						// [s] timestep between rho measurements
 
 

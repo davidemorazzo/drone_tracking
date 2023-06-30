@@ -36,8 +36,8 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 		std::string(this->ros_namespace + "/fmu/out/timesync_status"), 10, 
 		std::bind(& Vehicle::timesync_status_cb, this, _1));
 
-	this->current_state = MissionState::IDLE;
-	this->next_state = MissionState::IDLE;
+	this->current_state = MissionState::NOT_CONNECTED;
+	this->next_state = MissionState::NOT_CONNECTED;
 
 	RCLCPP_INFO(this->get_logger(), "Vehicle initialized");
 }
@@ -95,11 +95,15 @@ bool Vehicle::xrce_connected(){
 
 void Vehicle::mission_update(){
 
-	if (!this->xrce_connected()){return;}
-	
 	current_state = next_state;
 
 	switch(current_state){
+		case NOT_CONNECTED:
+			if(xrce_connected()){
+				next_state = MissionState::IDLE;
+				RCLCPP_INFO(this->get_logger(), "XRCE CONNECTED!");
+			}
+			break;
 		case IDLE:
 			if(this->nav_state() == VehicleStatus::NAVIGATION_STATE_OFFBOARD){
 				RCLCPP_INFO(this->get_logger(), "IDLE=>PREFLIGHT_CHECK");
@@ -143,7 +147,7 @@ void Vehicle::mission_update(){
 
 		
 		default:
-			next_state = MissionState::IDLE;
+			next_state = MissionState::NOT_CONNECTED;
 			break;
 	}
 

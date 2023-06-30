@@ -18,6 +18,11 @@ find_package(geometry_msgs REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
+
 ############## VEHICLE NODE ######################
 add_executable(vehicle 
   src/vehicle.cpp)
