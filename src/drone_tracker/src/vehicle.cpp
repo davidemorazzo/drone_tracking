@@ -42,6 +42,9 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 	this->vehicle_odometry_sub = this->create_subscription<VehicleOdometry>(
 		std::string(this->ros_namespace + "/fmu/out/vehicle_odometry"), sub_qos, 
 		std::bind(& Vehicle::vehicle_odometry_cb, this, _1));
+	this->create_subscription<std_msgs::msg::Float64MultiArray>(
+		std::string(this->ros_namespace + "/acceleration_cmd"), sub_qos, 
+		std::bind(& Vehicle::estimator_cb, this, _1));
 
 	this->current_state = MissionState::IDLE;
 	this->next_state = MissionState::IDLE;
@@ -153,31 +156,45 @@ void Vehicle::mission_update(){
 			next_state = MissionState::IDLE;
 			break;
 	}
+}
 
+void Vehicle::publish_hor_acc_setpoint(float acc_x, float acc_y, float height, float yaw){
+	/* Control drone in acceleration in XY and set a height */
+	TrajectorySetpoint msg = TrajectorySetpoint();
+	offboard_control_mode->acceleration=true;
+	offboard_control_mode->velocity = false;
+	offboard_control_mode->position = false;
+	msg.position = {NAN, NAN, height};				// Important set the correct NAN values
+	msg.velocity = {NAN, NAN, NAN};
+	msg.acceleration = {acc_x, acc_y, NAN};
+	msg.timestamp = this->get_now_timestamp();
+	msg.yaw = yaw;
+	trajectory_setpoint_pub->publish(msg);
+}
+
+void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
+	TrajectorySetpoint msg = TrajectorySetpoint();
+	offboard_control_mode->position = true;
+	msg.position = {x, y, z};
+	msg.timestamp = this->get_now_timestamp();
+	msg.yaw = yaw;
+	trajectory_setpoint_pub->publish(msg);
 }
 
 bool Vehicle::mission_func(){
-	TrajectorySetpoint msg = TrajectorySetpoint();
-	
 	if (mission_cb_cnt < 20){
-		msg.position = {0 , 0, -2.0};
+		publish_pos_setpoint(0, 0, -2, 0);
 	}else{
-		offboard_control_mode->acceleration=true;
-		offboard_control_mode->position = false;
-		msg.position = {NAN, NAN, -2.0};
-		msg.acceleration = {sin(acc_angle), 0.0, NAN};
+		publish_hor_acc_setpoint(sin(acc_angle), 0, -2, 0);
 		acc_angle += 1;
 	}
-
-	// offboard_control_mode->acceleration=true;
-	// offboard_control_mode->position = false;
-	// offboard_control_mode->velocity = false;
-	// msg.position = {NAN , NAN, -3.0};
-	// msg.acceleration = {0.3, 0.0, NAN};
 	
-	msg.velocity = {NAN, NAN, NAN};
-	msg.timestamp = this->get_now_timestamp();
-	msg.yaw = 0.0;
-	this->trajectory_setpoint_pub->publish(msg);
 	return mission_cb_cnt++ > 60;
+}
+
+/* When a new acceleration command is available from the estimator, it is published to the autopilot */
+void Vehicle::estimator_cb(const std_msgs::msg::Float64MultiArray & message){
+	float ax = message.data[0];
+	float ay = message.data[1];
+	publish_hor_acc_setpoint(ax, ay, -1.5, 0);
 }

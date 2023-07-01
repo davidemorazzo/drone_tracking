@@ -12,6 +12,7 @@
 #include "px4_msgs/msg/vehicle_command.hpp"
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 
 using namespace px4_msgs::msg;
 using namespace std::chrono_literals;
@@ -47,6 +48,8 @@ public:
 	void publish_offboard_control_signal(); 										// Offboard control message as keepalive
 	void publish_trajectory_setpoint(px4_msgs::msg::TrajectorySetpoint message);	// Set the position setpoint of the drone
 	void mission_update();
+	void publish_hor_acc_setpoint(float ax, float ay, float z, float yaw);			// Publish a setpoint to control horizontal acceleration
+	void publish_pos_setpoint(float x, float y, float z, float yaw);				// Publish a position setpoint
 
 private:
 	std::string ros_namespace;
@@ -79,6 +82,7 @@ private:
 		this->timesync_status = std::make_shared<TimesyncStatus>(std::move(message));};
 	void vehicle_odometry_cb(const VehicleOdometry & message) {
 		this->vehicle_odometry = std::make_shared<VehicleOdometry>(std::move(message));};
+	void estimator_cb(const std_msgs::msg::Float64MultiArray & message);
 
 	/*------ PUBLISHERS ------ */
 

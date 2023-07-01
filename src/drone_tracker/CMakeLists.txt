@@ -27,7 +27,7 @@ install(DIRECTORY
 add_executable(vehicle 
   src/vehicle.cpp)
 
-ament_target_dependencies(vehicle px4_msgs rclcpp)
+ament_target_dependencies(vehicle px4_msgs rclcpp std_msgs)
 target_include_directories(vehicle PUBLIC
 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include>)
