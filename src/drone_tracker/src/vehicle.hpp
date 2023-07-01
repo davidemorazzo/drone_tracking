@@ -17,14 +17,10 @@ using namespace px4_msgs::msg;
 using namespace std::chrono_literals;
 
 enum MissionState {
-	NOT_CONNECTED,
 	IDLE,
 	PREFLIGHT_CHECK,
-	ARMING,
-	ARMED,
 	MISSION,
 	LANDING,
-	FAILSAFE
 };
 
 class Vehicle : public rclcpp::Node {
@@ -35,6 +31,7 @@ public:
 	px4_msgs::msg::VehicleControlMode::SharedPtr vehicle_control_mode = nullptr;
 	px4_msgs::msg::TimesyncStatus::SharedPtr timesync_status = nullptr;
 	px4_msgs::msg::OffboardControlMode::SharedPtr offboard_control_mode = nullptr;
+	px4_msgs::msg::VehicleOdometry::SharedPtr vehicle_odometry = nullptr;
 
 	bool is_armed()			{return this->vehicle_status->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;};
 	bool preflight_check()	{return this->vehicle_status->pre_flight_checks_pass;};
@@ -55,6 +52,7 @@ private:
 	std::string ros_namespace;
 	MissionState current_state, next_state;
 	int mission_cb_cnt = 0;
+	float acc_angle = 0;
 
 	rclcpp::QoS sub_qos = rclcpp::QoS(0)
 		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
@@ -70,7 +68,8 @@ private:
 
 	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub = nullptr;
 	rclcpp::Subscription<px4_msgs::msg::VehicleControlMode>::SharedPtr vehicle_control_mode_sub = nullptr;
-	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr timesync_status_sub = nullptr;		  
+	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr timesync_status_sub = nullptr;
+	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr vehicle_odometry_sub = nullptr;		  
 
 	void vehicle_status_cb(const VehicleStatus & message) {
 		this->vehicle_status = std::make_shared<VehicleStatus>(std::move(message));};
@@ -78,6 +77,8 @@ private:
 		this->vehicle_control_mode = std::make_shared<VehicleControlMode>(std::move(message));};
 	void timesync_status_cb(const TimesyncStatus & message) {
 		this->timesync_status = std::make_shared<TimesyncStatus>(std::move(message));};
+	void vehicle_odometry_cb(const VehicleOdometry & message) {
+		this->vehicle_odometry = std::make_shared<VehicleOdometry>(std::move(message));};
 
 	/*------ PUBLISHERS ------ */
 

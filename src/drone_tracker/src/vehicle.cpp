@@ -1,5 +1,6 @@
 #include "vehicle.hpp"
 #include "rclcpp/rclcpp.hpp"
+#include <math.h>
 
 using namespace px4_msgs::msg;
 using std::placeholders::_1;
@@ -38,9 +39,12 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 	this->timesync_status_sub = this->create_subscription<TimesyncStatus>(
 		std::string(this->ros_namespace + "/fmu/out/timesync_status"), sub_qos, 
 		std::bind(& Vehicle::timesync_status_cb, this, _1));
+	this->vehicle_odometry_sub = this->create_subscription<VehicleOdometry>(
+		std::string(this->ros_namespace + "/fmu/out/vehicle_odometry"), sub_qos, 
+		std::bind(& Vehicle::vehicle_odometry_cb, this, _1));
 
-	this->current_state = MissionState::NOT_CONNECTED;
-	this->next_state = MissionState::NOT_CONNECTED;
+	this->current_state = MissionState::IDLE;
+	this->next_state = MissionState::IDLE;
 
 	RCLCPP_INFO(this->get_logger(), "Vehicle initialized");
 }
@@ -101,19 +105,15 @@ void Vehicle::mission_update(){
 	current_state = next_state;
 
 	switch(current_state){
-		case NOT_CONNECTED:
-			if(xrce_connected()){
-				next_state = MissionState::IDLE;
-				RCLCPP_INFO(this->get_logger(), "XRCE CONNECTED!");
-			}
-			break;
 		case IDLE:
-			if(this->nav_state() == VehicleStatus::NAVIGATION_STATE_OFFBOARD){
-				RCLCPP_INFO(this->get_logger(), "IDLE=>PREFLIGHT_CHECK");
-				next_state = MissionState::PREFLIGHT_CHECK;
-			}else{
-				this->offboard_flight_mode(); /*Set offboard flight mode*/
-				next_state = MissionState::IDLE;
+			if (xrce_connected()){
+				if(this->nav_state() == VehicleStatus::NAVIGATION_STATE_OFFBOARD){
+					RCLCPP_INFO(this->get_logger(), "IDLE=>PREFLIGHT_CHECK");
+					next_state = MissionState::PREFLIGHT_CHECK;
+				}else{
+					this->offboard_flight_mode(); /*Set offboard flight mode*/
+					next_state = MissionState::IDLE;
+				}
 			}
 			break;
 		//-----------------------------------------------------
@@ -128,19 +128,6 @@ void Vehicle::mission_update(){
 			else 
 				{next_state = MissionState::PREFLIGHT_CHECK;}
 		break;
-		//-----------------------------------------------------
-		case ARMING:
-			this->send_arm_command();
-			next_state = MissionState::ARMED;
-			RCLCPP_INFO(this->get_logger(), "ARMING=>ARMED");
-			break;
-		//-----------------------------------------------------
-		case ARMED:
-			if(this->is_armed()){
-				next_state = MissionState::MISSION;
-				RCLCPP_INFO(this->get_logger(), "ARMED=>MISSION");}
-			else{next_state = MissionState::ARMED;}
-			break;
 		//-----------------------------------------------------
 		case MISSION:
 			if(this->mission_func())
@@ -160,12 +147,10 @@ void Vehicle::mission_update(){
 			}
 			break;
 		//-----------------------------------------------------
-		case FAILSAFE:
-			break;
 
 		
 		default:
-			next_state = MissionState::NOT_CONNECTED;
+			next_state = MissionState::IDLE;
 			break;
 	}
 
@@ -173,12 +158,26 @@ void Vehicle::mission_update(){
 
 bool Vehicle::mission_func(){
 	TrajectorySetpoint msg = TrajectorySetpoint();
-	msg.position = {0.0 , 0.0, -4.0};
+	
+	if (mission_cb_cnt < 20){
+		msg.position = {0 , 0, -2.0};
+	}else{
+		offboard_control_mode->acceleration=true;
+		offboard_control_mode->position = false;
+		msg.position = {NAN, NAN, -2.0};
+		msg.acceleration = {sin(acc_angle), 0.0, NAN};
+		acc_angle += 1;
+	}
+
+	// offboard_control_mode->acceleration=true;
+	// offboard_control_mode->position = false;
+	// offboard_control_mode->velocity = false;
+	// msg.position = {NAN , NAN, -3.0};
+	// msg.acceleration = {0.3, 0.0, NAN};
+	
+	msg.velocity = {NAN, NAN, NAN};
 	msg.timestamp = this->get_now_timestamp();
-	msg.yaw = 3.14/2.0;
+	msg.yaw = 0.0;
 	this->trajectory_setpoint_pub->publish(msg);
-	// this->publish_trajectory_setpoint(msg);
-	// RCLCPP_INFO(this->get_logger(), "Mission callback");
-	// return false;
-	return mission_cb_cnt++ > 15;
+	return mission_cb_cnt++ > 60;
 }
