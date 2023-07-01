@@ -54,12 +54,23 @@ public:
 private:
 	std::string ros_namespace;
 	MissionState current_state, next_state;
+	int mission_cb_cnt = 0;
 
+	rclcpp::QoS sub_qos = rclcpp::QoS(0)
+		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
+		.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL)
+		.history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
+
+	rclcpp::QoS pub_qos = rclcpp::QoS(10)
+		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
+		.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE)
+		.history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
+	
 	/*------ SUBSCRIBERS ----- */
 
-	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub;
-	rclcpp::Subscription<px4_msgs::msg::VehicleControlMode>::SharedPtr vehicle_control_mode_sub;
-	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr timesync_status_sub;		  
+	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub = nullptr;
+	rclcpp::Subscription<px4_msgs::msg::VehicleControlMode>::SharedPtr vehicle_control_mode_sub = nullptr;
+	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr timesync_status_sub = nullptr;		  
 
 	void vehicle_status_cb(const VehicleStatus & message) {
 		this->vehicle_status = std::make_shared<VehicleStatus>(std::move(message));};

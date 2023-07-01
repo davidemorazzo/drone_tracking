@@ -22,18 +22,21 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 
 	/*Creating publishers*/
 	this->vehicle_command_pub = this->create_publisher<VehicleCommand>(
-		std::string(this->ros_namespace + "/fmu/in/vehicle_command"), 10);
+		std::string(this->ros_namespace + "/fmu/in/vehicle_command"), pub_qos);
 	this->offboard_control_mode_pub = this->create_publisher<OffboardControlMode>(
-		std::string(this->ros_namespace + "/fmu/in/offboard_control_mode"), 10);
+		std::string(this->ros_namespace + "/fmu/in/offboard_control_mode"), pub_qos);
+	this->trajectory_setpoint_pub = this->create_publisher<TrajectorySetpoint>(
+		std::string(ros_namespace + "/fmu/in/trajectory_setpoint"), pub_qos);
+
 	/*Creating subscriptions*/
 	this->vehicle_status_sub = this->create_subscription<VehicleStatus>(
-		std::string(this->ros_namespace + "/fmu/out/vehicle_status"), 10, 
+		std::string(this->ros_namespace + "/fmu/out/vehicle_status"), sub_qos, 
 		std::bind(& Vehicle::vehicle_status_cb, this, _1));
 	this->vehicle_control_mode_sub = this->create_subscription<VehicleControlMode>(
-		std::string(this->ros_namespace + "/fmu/out/vehicle_control_mode"), 10, 
+		std::string(this->ros_namespace + "/fmu/out/vehicle_control_mode"), sub_qos, 
 		std::bind(& Vehicle::vehicle_control_mode_cb, this, _1));
 	this->timesync_status_sub = this->create_subscription<TimesyncStatus>(
-		std::string(this->ros_namespace + "/fmu/out/timesync_status"), 10, 
+		std::string(this->ros_namespace + "/fmu/out/timesync_status"), sub_qos, 
 		std::bind(& Vehicle::timesync_status_cb, this, _1));
 
 	this->current_state = MissionState::NOT_CONNECTED;
@@ -88,9 +91,9 @@ void Vehicle::publish_trajectory_setpoint(px4_msgs::msg::TrajectorySetpoint mess
 }
 
 bool Vehicle::xrce_connected(){
-	return this->vehicle_status != nullptr and
-		this->vehicle_control_mode != nullptr and
-		this->timesync_status != nullptr;
+	return (this->vehicle_status != nullptr) &&
+		(this->vehicle_control_mode != nullptr) &&
+		(this->timesync_status != nullptr);
 }
 
 void Vehicle::mission_update(){
@@ -116,9 +119,14 @@ void Vehicle::mission_update(){
 		//-----------------------------------------------------
 		case PREFLIGHT_CHECK:
 			if(this->preflight_check())	{
-				next_state = MissionState::ARMING;
-				RCLCPP_INFO(this->get_logger(), "PREFLIGHT_CHECK=>ARMING");}
-			else {next_state = MissionState::PREFLIGHT_CHECK;}
+				if(!this->is_armed()){
+					this->send_arm_command();
+					next_state = MissionState::MISSION;
+					RCLCPP_INFO(this->get_logger(), "PREFLIGHT_CHECK=>MISSION");
+					}
+				}
+			else 
+				{next_state = MissionState::PREFLIGHT_CHECK;}
 		break;
 		//-----------------------------------------------------
 		case ARMING:
@@ -135,11 +143,21 @@ void Vehicle::mission_update(){
 			break;
 		//-----------------------------------------------------
 		case MISSION:
-			if(this->mission_func()){next_state = MissionState::LANDING;}
-			else{next_state = MissionState::MISSION;}
+			if(this->mission_func())
+			{
+				RCLCPP_INFO(get_logger(), "MISSION=>LANDING");
+				next_state = MissionState::LANDING;
+			}
+			else
+				{next_state = MissionState::MISSION;}
 			break;
 		//-----------------------------------------------------
 		case LANDING:
+			if(vehicle_status->nav_state != VehicleStatus::NAVIGATION_STATE_AUTO_LAND){
+				vehicle_command_pub->publish(
+					create_vehicle_command(VehicleCommand::VEHICLE_CMD_NAV_LAND)
+				);
+			}
 			break;
 		//-----------------------------------------------------
 		case FAILSAFE:
@@ -158,6 +176,9 @@ bool Vehicle::mission_func(){
 	msg.position = {0.0 , 0.0, -4.0};
 	msg.timestamp = this->get_now_timestamp();
 	msg.yaw = 3.14/2.0;
-	this->publish_trajectory_setpoint(msg);
-	return true;
+	this->trajectory_setpoint_pub->publish(msg);
+	// this->publish_trajectory_setpoint(msg);
+	// RCLCPP_INFO(this->get_logger(), "Mission callback");
+	// return false;
+	return mission_cb_cnt++ > 15;
 }
