@@ -20,10 +20,8 @@ def generate_launch_description():
         launch_ros.actions.Node(
         package='drone_tracker',
         executable='vehicle',
-        namespace=f'/drone1',
-        name=f'vehicle',
-        parameters=[
-            {'simulation':True}])
+        namespace=f'/drone2',
+        name=f'vehicle')
     )
     # ---- MOTION CAPTURE --- #
     nodes_list.append(
@@ -31,15 +29,15 @@ def generate_launch_description():
         package='drone_tracker_py',
         executable='mocap_gazebo',
         name=f'mocap_node',
-        namespace=f'/drone1')
+        namespace=f'/drone2')
     )
-    # ---- CAMERA SIMULATION --- #
-    # nodes_list.append(
-    #     launch_ros.actions.Node(
-    #     package='drone_tracker_py',
-    #     executable='camera_sim',
-    #     name=f'drone_tracker_py{i+1}',
-    #     namespace=f'/drone{i+1}')
-    # )
+    # ---- CAMERA NODE --- #
+    nodes_list.append(
+        launch_ros.actions.Node(
+        package='drone_tracker',
+        executable='camera',
+        name=f'camera',
+        namespace=f'/drone2')
+    )
 
     return launch.LaunchDescription(nodes_list)

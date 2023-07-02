@@ -7,12 +7,16 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 INCLUDE_DIRECTORIES ( "/usr/include/eigen3" )
+INCLUDE_DIRECTORIES ("/usr/include/opencv4")
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -22,6 +26,15 @@ install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
 )
+############## CAMERA NODE ######################
+add_executable(camera 
+  src/camera.cpp)
+
+ament_target_dependencies(camera rclcpp std_msgs sensor_msgs cv_bridge OpenCV)
+target_include_directories(camera PUBLIC
+$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+$<INSTALL_INTERFACE:include>)
+target_compile_features(camera PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
 ############## VEHICLE NODE ######################
 add_executable(vehicle 
@@ -43,7 +56,7 @@ target_include_directories(estimator PUBLIC
   $<INSTALL_INTERFACE:include>)
 target_compile_features(estimator PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS estimator vehicle
+install(TARGETS estimator vehicle camera
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
