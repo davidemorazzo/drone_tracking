@@ -20,6 +20,11 @@
 using namespace Eigen;
 using std::placeholders::_1;
 
+rclcpp::QoS px4_sub_qos = rclcpp::QoS(0)
+		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
+		.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL)
+		.history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
+
 
 class EASN_estimation : public rclcpp::Node
 {
@@ -298,31 +303,32 @@ private:
 	void generate_subscribers(){
 		/* Odometry topics */
 		this->self_odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-			"/drone" + this->me + "/fmu/out/vehicle_odometry", 10,
+			"/drone" + std::to_string(std::stoi(this->me)+2) + "/fmu/out/vehicle_odometry", px4_sub_qos,
 			std::bind(& EASN_estimation::self_odom_cb, this, _1)); 
 		this->nA_odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-			"/drone" + this->nA + "/fmu/out/vehicle_odometry", 10,
+			"/drone" + std::to_string(std::stoi(this->nA)+2) + "/fmu/out/vehicle_odometry", px4_sub_qos,
 			std::bind(& EASN_estimation::nA_odom_cb, this, _1)); 
 		this->nB_odometry_sub = this->create_subscription<px4_msgs::msg::VehicleOdometry>(
-			"/drone" + this->nB + "/fmu/out/vehicle_odometry", 10,
+			"/drone" + std::to_string(std::stoi(this->nB)+2) + "/fmu/out/vehicle_odometry", px4_sub_qos,
 			std::bind(& EASN_estimation::nB_odom_cb, this, _1));
-		this->sensor_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-			"/drone" + this->me + "/sensor_measure", 10,
-			std::bind(& EASN_estimation::sensor_cb, this, _1)); 
 		
 		/* Estimator topics */
+		this->sensor_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+			"/drone" + std::to_string(std::stoi(this->me)+2) + "/sensor_measure", 10,
+			std::bind(& EASN_estimation::sensor_cb, this, _1)); 
 		this->nA_info_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-			"/drone" + this->nA + "/information", 10,
+			"/drone" + std::to_string(std::stoi(this->nA)+2) + "/information", 10,
 			std::bind(& EASN_estimation::nA_info_cb, this, _1)); 
 		this->nB_info_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-			"/drone" + this->nB + "/information", 10,
+			"/drone" + std::to_string(std::stoi(this->nB)+2) + "/information", 10,
 			std::bind(& EASN_estimation::nB_info_cb, this, _1)); 
 	}
 
 	void generate_publishers(){
-		this->self_info_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + this->me + "/information", 10);
-		this->self_estimate_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + this->me + "/estimation", 10);
-		this->drone_command_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + this->me + "/acceleration_cmd",10);
+		std::string self_topic_id = std::to_string(std::stoi(this->me)+2);
+		this->self_info_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + self_topic_id + "/information", 10);
+		this->self_estimate_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + self_topic_id + "/estimation", 10);
+		this->drone_command_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + self_topic_id + "/acceleration_cmd",10);
 	}
 
 	void self_odom_cb(const px4_msgs::msg::VehicleOdometry msg){this->self_odom = msg;};
@@ -336,12 +342,14 @@ private:
 		message is available */
 	void sensor_cb(const std_msgs::msg::Float64MultiArray msg){
 		// Calculate DT in seconds
-		this->measured_DT = this->last_sensor_info.data[3] - msg.data[3];
+		this->measured_DT = this->last_sensor_info.data[2] - msg.data[2];
 		this->last_sensor_info = msg;
 
 		// Do estimation
 		this->estimation();
-		this->compute_flocking_cmd();
+
+		RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f", x_est[0], x_est[1]);
+		// this->compute_flocking_cmd();
 
 		// Publish acceleration command 
 		std_msgs::msg::Float64MultiArray acc_msg;

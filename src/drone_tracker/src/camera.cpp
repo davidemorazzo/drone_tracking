@@ -8,11 +8,11 @@
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/core/quaternion.hpp"
-// #include "opencv2/aruco.hpp"
 #include "cv_bridge/cv_bridge.h"
 
 
 using namespace std::chrono_literals;
+using namespace std::chrono;
 using std::placeholders::_1;
 
 
@@ -36,6 +36,10 @@ public:
 
 		marker_pose_pub = create_publisher<geometry_msgs::msg::PointStamped>(
 			std::string(ros_namespace + "/marker_pose"), 10);
+
+		rho_theta_pub = create_publisher<std_msgs::msg::Float64MultiArray>(
+			std::string(ros_namespace + "/sensor_measure"), 10);
+
 
 		float c_matrix[3][3] = {
 			{381.3624668, 0.0e+00, 320.5}, 
@@ -62,6 +66,7 @@ private:
 	rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odom_sub;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr marker_pose_pub;
+	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr rho_theta_pub;
 	float vehicle_pos[3] = {0.0, 0.0, 0.0};
 	float vehicle_q[4] = {0.0, 0.0, 0.0, 0.0};
 	 
@@ -108,9 +113,9 @@ private:
 			cv::Mat camera_mtx = this->cameraTrasl(markerCorners.at(0));
 			cv::Mat drone_mtx = this->drone_matrix();
 			cv::Mat marker_pose = camera_mtx * drone_mtx;
-			std::string out = "Marker mtx: ";
-			out << marker_pose;
-			RCLCPP_INFO(get_logger(), out.c_str());
+			// std::string out = "Marker mtx: ";
+			// out << marker_pose;
+			// RCLCPP_INFO(get_logger(), out.c_str());
 
 			geometry_msgs::msg::PointStamped point;
 			point.header.frame_id = "map";
@@ -120,6 +125,14 @@ private:
 			point.point.z = marker_pose.at<float>(2,3);
 			this->marker_pose_pub->publish(point);
 
+			/* Polar coordinates */
+			std::vector<float> rho_theta = this->polar_coordinates(marker_pose, drone_mtx);
+			// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
+			std_msgs::msg::Float64MultiArray rho_theta_msg;
+			rho_theta_msg.data.push_back(float(rho_theta[0]));
+			rho_theta_msg.data.push_back(float(rho_theta[1]));
+			rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
+			this->rho_theta_pub->publish(rho_theta_msg);
 		}
 		
 	};
@@ -159,16 +172,16 @@ private:
 		return cv::Mat(drone_matrix);
 	}
 
-	std::vector<float> polar_coordinates(cv::Mat camera_mtx){
-		float rho = sqrt(pow(camera_mtx.at<float>(0,3),2) + pow(camera_mtx.at<float>(1,3),2));
-		float theta = atan2(camera_mtx.at<float>(1,3), camera_mtx.at<float>(0,3));
+	std::vector<float> polar_coordinates(cv::Mat marker_mtx, cv::Mat drone_mtx){
+		float delta_x = marker_mtx.at<float>(0,3) - drone_mtx.at<float>(0,3);
+		float delta_y = marker_mtx.at<float>(1,3) - drone_mtx.at<float>(1,3);
+		float rho = sqrt(pow(delta_x,2) + pow(delta_y,2));
+		float theta = atan2(delta_y, delta_x);
+		std::vector<float> result;
+		result.push_back(rho);
+		result.push_back(theta);
+		return result;
 	}
-
-
-	/*------ PUBLISHERS ------ */
-
-	
-	/*-------- TIMERS ----------*/
 	
 };
 

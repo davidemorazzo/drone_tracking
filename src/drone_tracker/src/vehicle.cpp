@@ -100,7 +100,8 @@ void Vehicle::publish_trajectory_setpoint(px4_msgs::msg::TrajectorySetpoint mess
 bool Vehicle::xrce_connected(){
 	return (this->vehicle_status != nullptr) &&
 		(this->vehicle_control_mode != nullptr) &&
-		(this->timesync_status != nullptr);
+		(this->timesync_status != nullptr) &&
+		(this->vehicle_odometry != nullptr);
 }
 
 void Vehicle::mission_update(){
@@ -175,7 +176,10 @@ void Vehicle::publish_hor_acc_setpoint(float acc_x, float acc_y, float height, f
 void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
 	TrajectorySetpoint msg = TrajectorySetpoint();
 	offboard_control_mode->position = true;
-	msg.position = {x, y, z};
+	msg.position = {
+		x + this->vehicle_starting_position[0], 
+		y + this->vehicle_starting_position[0], 
+		z};
 	msg.timestamp = this->get_now_timestamp();
 	msg.yaw = yaw;
 	trajectory_setpoint_pub->publish(msg);
@@ -183,9 +187,9 @@ void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
 
 bool Vehicle::mission_func(){
 	if (mission_cb_cnt < 30){
-		publish_pos_setpoint(-0.5, 0, -2, 0);
+		publish_pos_setpoint(0.0, 0.0, -2, 0);
 	}else{
-		publish_pos_setpoint(0.0, 0.5, -2, 0);
+		publish_pos_setpoint(1.0, 0.0, -2, 0);
 	}
 	// publish_pos_setpoint(-0.5, 0, -2, 0);
 	return mission_cb_cnt++ > 100;

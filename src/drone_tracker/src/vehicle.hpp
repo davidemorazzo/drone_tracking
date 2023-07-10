@@ -33,6 +33,7 @@ public:
 	px4_msgs::msg::TimesyncStatus::SharedPtr timesync_status = nullptr;
 	px4_msgs::msg::OffboardControlMode::SharedPtr offboard_control_mode = nullptr;
 	px4_msgs::msg::VehicleOdometry::SharedPtr vehicle_odometry = nullptr;
+	float vehicle_starting_position[3] = {NAN, NAN, NAN};
 
 	bool is_armed()			{return this->vehicle_status->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;};
 	bool preflight_check()	{return this->vehicle_status->pre_flight_checks_pass;};
@@ -81,7 +82,12 @@ private:
 	void timesync_status_cb(const TimesyncStatus & message) {
 		this->timesync_status = std::make_shared<TimesyncStatus>(std::move(message));};
 	void vehicle_odometry_cb(const VehicleOdometry & message) {
-		this->vehicle_odometry = std::make_shared<VehicleOdometry>(std::move(message));};
+		this->vehicle_odometry = std::make_shared<VehicleOdometry>(std::move(message));
+		if (this->vehicle_starting_position[0] == NAN){
+			this->vehicle_starting_position[0] = this->vehicle_odometry->position[0];
+			this->vehicle_starting_position[1] = this->vehicle_odometry->position[1];
+			this->vehicle_starting_position[2] = this->vehicle_odometry->position[2];
+		}};
 	void estimator_cb(const std_msgs::msg::Float64MultiArray & message);
 
 	/*------ PUBLISHERS ------ */

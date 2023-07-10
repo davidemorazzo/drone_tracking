@@ -15,7 +15,7 @@ def generate_launch_description():
             '8888'
         ]],
         shell=True))
-
+    # ------- COMMANDER -------- #
     nodes_list.append(
         launch_ros.actions.Node(
         package='drone_tracker',
@@ -38,6 +38,19 @@ def generate_launch_description():
         executable='camera',
         name=f'camera',
         namespace=f'/drone2')
+    )
+    # ------ ESTIMATOR ------ #
+    nodes_list.append(
+        launch_ros.actions.Node(
+        package='drone_tracker',
+        executable='estimator',
+        name=f'estimator',
+        namespace=f'/drone2',
+        parameters=[
+            {"self_id":"0"},
+            {"nA_id":"1"},
+            {"nB_id":"2"}
+        ])
     )
 
     return launch.LaunchDescription(nodes_list)
