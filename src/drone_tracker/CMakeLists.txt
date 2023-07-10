@@ -7,7 +7,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 INCLUDE_DIRECTORIES ( "/usr/include/eigen3" )
-INCLUDE_DIRECTORIES ("/usr/include/opencv4")
+INCLUDE_DIRECTORIES ( "/usr/local/include/opencv4 ")
+include_directories( ${OpenCV_INCLUDE_DIRS} )
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -16,7 +17,7 @@ find_package(px4_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
-find_package(OpenCV REQUIRED)
+# find_package(OpenCV REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -30,7 +31,8 @@ install(DIRECTORY
 add_executable(camera 
   src/camera.cpp)
 
-ament_target_dependencies(camera rclcpp std_msgs sensor_msgs cv_bridge OpenCV)
+target_link_libraries(camera ${OpenCV_LIBS})
+ament_target_dependencies(camera rclcpp std_msgs sensor_msgs cv_bridge px4_msgs, geometry_msgs)
 target_include_directories(camera PUBLIC
 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include>)

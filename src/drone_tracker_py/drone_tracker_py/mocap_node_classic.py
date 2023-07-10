@@ -31,12 +31,15 @@ class MocapNode (Node):
             history=QoSHistoryPolicy.KEEP_LAST,
             depth=1
         )
+        self.ros_ns = self.get_namespace()
+        if self.ros_ns == "/":
+            self.ros_ns = ""
         # Subscribers
-        self.subscriber_ =      self.create_subscription(Odometry, self.get_namespace()+"/odom", self.listener_cb, 10)
+        self.subscriber_ =      self.create_subscription(Odometry, self.ros_ns+"/odom", self.listener_cb, 10)
         # Publishers
-        self.pose_pub =         self.create_publisher(PoseStamped,      self.get_namespace()+"/pose", 10)
-        self.path_pub =         self.create_publisher(Path,             self.get_namespace()+"/path", 10)
-        self.mocap_odom_pub =   self.create_publisher(VehicleOdometry,  self.get_namespace()+"/fmu/in/vehicle_visual_odometry", 10)
+        self.pose_pub =         self.create_publisher(PoseStamped,      self.ros_ns+"/pose", 10)
+        self.path_pub =         self.create_publisher(Path,             self.ros_ns+"/path", 10)
+        self.mocap_odom_pub =   self.create_publisher(VehicleOdometry,  self.ros_ns+"/fmu/in/vehicle_visual_odometry", 10)
         # Messages
         self.vehicle_path_msg = Path()
         self.vehicle_path_msg.header.frame_id = 'map'
