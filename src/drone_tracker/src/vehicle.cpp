@@ -178,7 +178,7 @@ void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
 	offboard_control_mode->position = true;
 	msg.position = {
 		x + this->vehicle_starting_position[0], 
-		y + this->vehicle_starting_position[0], 
+		y + this->vehicle_starting_position[1], 
 		z};
 	msg.timestamp = this->get_now_timestamp();
 	msg.yaw = yaw;
@@ -186,7 +186,7 @@ void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
 }
 
 bool Vehicle::mission_func(){
-	if (mission_cb_cnt < 30){
+	if (mission_cb_cnt < 50){
 		publish_pos_setpoint(0.0, 0.0, -2, 0);
 	}else{
 		publish_pos_setpoint(1.0, 0.0, -2, 0);

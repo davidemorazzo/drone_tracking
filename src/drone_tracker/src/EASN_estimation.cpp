@@ -341,6 +341,9 @@ private:
 	/* Execute the estimation and compute the flocking command each time a new sensor 
 		message is available */
 	void sensor_cb(const std_msgs::msg::Float64MultiArray msg){
+		if(this->last_sensor_info.data.empty()){
+			this->last_sensor_info = msg;
+		}
 		// Calculate DT in seconds
 		this->measured_DT = this->last_sensor_info.data[2] - msg.data[2];
 		this->last_sensor_info = msg;
@@ -348,7 +351,7 @@ private:
 		// Do estimation
 		this->estimation();
 
-		RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f", x_est[0], x_est[1]);
+		RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f vx=%.3f vy=%.3f", x_est[0], x_est[1],x_est[2], x_est[3]);
 		// this->compute_flocking_cmd();
 
 		// Publish acceleration command 
