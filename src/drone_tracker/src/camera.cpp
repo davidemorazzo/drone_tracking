@@ -7,6 +7,7 @@
 #include "geometry_msgs/msg/point_stamped.hpp"
 
 #include "opencv2/opencv.hpp"
+#include "opencv2/core/quaternion.hpp"
 // #include "opencv2/aruco.hpp"
 #include "cv_bridge/cv_bridge.h"
 
@@ -62,6 +63,7 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odom_sub;
 	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr marker_pose_pub;
 	float vehicle_pos[3] = {0.0, 0.0, 0.0};
+	float vehicle_q[4] = {0.0, 0.0, 0.0, 0.0};
 	 
 
 
@@ -79,6 +81,10 @@ private:
 		this->vehicle_pos[0] = msg.position[0];
 		this->vehicle_pos[1] = msg.position[1];
 		this->vehicle_pos[2] = msg.position[2];
+		this->vehicle_q[0] = msg.q[0];
+		this->vehicle_q[1] = msg.q[1];
+		this->vehicle_q[2] = msg.q[2];
+		this->vehicle_q[3] = msg.q[3];
 	}
 	
 	void image_cb(const sensor_msgs::msg::Image &msg){
@@ -98,17 +104,20 @@ private:
 		
 		/* Markers pose estimation */
 		if(! markerCorners.empty()){
-			cv::Mat coord = this->cameraTrasl(markerCorners.at(0));
-			std::string out = "Traslation: ";
-			out << coord;
+
+			cv::Mat camera_mtx = this->cameraTrasl(markerCorners.at(0));
+			cv::Mat drone_mtx = this->drone_matrix();
+			cv::Mat marker_pose = camera_mtx * drone_mtx;
+			std::string out = "Marker mtx: ";
+			out << marker_pose;
 			RCLCPP_INFO(get_logger(), out.c_str());
 
 			geometry_msgs::msg::PointStamped point;
 			point.header.frame_id = "map";
 			point.header.stamp = this->now();
-			point.point.x = coord.at<float>(0,0);
-			point.point.y = coord.at<float>(0,1);
-			point.point.z = coord.at<float>(0,2);
+			point.point.x = marker_pose.at<float>(0,3);
+			point.point.y = marker_pose.at<float>(1,3);
+			point.point.z = marker_pose.at<float>(2,3);
 			this->marker_pose_pub->publish(point);
 
 		}
@@ -123,15 +132,36 @@ private:
 			center_point = points[0] + points[2];
 			center_point = center_point / 2;
 			
-			image_plane.at<float>(0,0) = center_point.x / -this->vehicle_pos[2];
-			image_plane.at<float>(1,0) = center_point.y / -this->vehicle_pos[2];
+			image_plane.at<float>(0,0) = center_point.x * -this->vehicle_pos[2];
+			image_plane.at<float>(1,0) = center_point.y * -this->vehicle_pos[2];
 			image_plane.at<float>(2,0) = -this->vehicle_pos[2];
 			
 			cv::Mat coord = cv::Mat(CV_32F,3,1); 
 			coord = this->cameraMatrixInv * image_plane;
-			return coord;
+
+			cv::Matx<float, 4, 4> camera_matrix = cv::Matx<float, 4, 4>::eye();
+			camera_matrix(0,3) = -coord.at<float>(1,0);
+			camera_matrix(1,3) = -coord.at<float>(0,0);
+			camera_matrix(2,3) = -coord.at<float>(2,0);
+
+			return cv::Mat(camera_matrix);
 		}	
 		return out;
+	}
+
+	cv::Mat drone_matrix(){
+		// cv::Mat drone_matrix = cv::Mat::eye(4,4,CV_32F);
+		cv::Quat<float> drone_quaternion = cv::Quat<float>(vehicle_q[0],vehicle_q[1],vehicle_q[2],vehicle_q[3]);
+		cv::Matx<float, 4, 4> drone_matrix = drone_quaternion.toRotMat4x4();
+		drone_matrix(0,3) =  this->vehicle_pos[0]; // add 15cm for camera position
+		drone_matrix(1,3) = -this->vehicle_pos[1];
+		drone_matrix(2,3) = -this->vehicle_pos[2];
+		return cv::Mat(drone_matrix);
+	}
+
+	std::vector<float> polar_coordinates(cv::Mat camera_mtx){
+		float rho = sqrt(pow(camera_mtx.at<float>(0,3),2) + pow(camera_mtx.at<float>(1,3),2));
+		float theta = atan2(camera_mtx.at<float>(1,3), camera_mtx.at<float>(0,3));
 	}
 
 

@@ -182,13 +182,12 @@ void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
 }
 
 bool Vehicle::mission_func(){
-	// if (mission_cb_cnt < 20){
-	// 	publish_pos_setpoint(0, 0, -2, 0);
-	// }else{
-	// 	publish_hor_acc_setpoint(sin(acc_angle), 0, -2, 0);
-	// 	acc_angle += 1;
-	// }
-	publish_pos_setpoint(-0.1, 0, -2, 0);
+	if (mission_cb_cnt < 30){
+		publish_pos_setpoint(-0.5, 0, -2, 0);
+	}else{
+		publish_pos_setpoint(0.0, 0.5, -2, 0);
+	}
+	// publish_pos_setpoint(-0.5, 0, -2, 0);
 	return mission_cb_cnt++ > 100;
 }
 

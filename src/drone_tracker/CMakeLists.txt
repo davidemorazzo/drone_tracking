@@ -32,7 +32,7 @@ add_executable(camera
   src/camera.cpp)
 
 target_link_libraries(camera ${OpenCV_LIBS})
-ament_target_dependencies(camera rclcpp std_msgs sensor_msgs cv_bridge px4_msgs, geometry_msgs)
+ament_target_dependencies(camera rclcpp std_msgs sensor_msgs cv_bridge px4_msgs geometry_msgs)
 target_include_directories(camera PUBLIC
 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include>)
