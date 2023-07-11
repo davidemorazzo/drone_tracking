@@ -124,6 +124,9 @@ void Vehicle::mission_update(){
 		case PREFLIGHT_CHECK:
 			if(this->preflight_check())	{
 				if(!this->is_armed()){
+					this->vehicle_starting_position[0] = this->vehicle_odometry->position[0];
+					this->vehicle_starting_position[1] = this->vehicle_odometry->position[1];
+					this->vehicle_starting_position[2] = this->vehicle_odometry->position[2];
 					this->send_arm_command();
 					next_state = MissionState::MISSION;
 					RCLCPP_INFO(this->get_logger(), "PREFLIGHT_CHECK=>MISSION");
@@ -192,7 +195,9 @@ bool Vehicle::mission_func(){
 		publish_pos_setpoint(1.0, 0.0, -2, 0);
 	}
 	// publish_pos_setpoint(-0.5, 0, -2, 0);
-	return mission_cb_cnt++ > 100;
+	// return mission_cb_cnt++ > 100;
+	mission_cb_cnt++;
+	return false;
 }
 
 /* When a new acceleration command is available from the estimator, it is published to the autopilot */

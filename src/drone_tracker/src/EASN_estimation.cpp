@@ -107,8 +107,8 @@ public:
 			
 			//////////////////////// MEASUREMENTS //////////////////////////////
 			
-			X = x_pred(0)- (self_odom.position[0] + x0[std::stoi(me)]); //relative position between predicted target and UAV along x axis 
-			Y = x_pred(1)- (self_odom.position[1] + y0[std::stoi(me)]); //relative position between predicted target and UAV along y axis 
+			X = x_pred(0) - (self_odom.position[0]);// + x0[std::stoi(me)]); //relative position between predicted target and UAV along x axis 
+			Y = x_pred(1) + (self_odom.position[1]);// + y0[std::stoi(me)]); //relative position between predicted target and UAV along y axis 
 
 			grad_h << X/sqrt(pow(X,2)+pow(Y,2)), Y/sqrt(pow(X,2)+pow(Y,2)), 0, 0,
 				-Y/(pow(X,2)+pow(Y,2))    , X/(pow(X,2)+pow(Y,2))    , 0, 0; // compute gradient of h to use in eq. (17) of EASN
@@ -116,7 +116,6 @@ public:
 			h_meas << sqrt(pow(X,2)+pow(Y,2)), atan2(Y,X) ; // compute h_i to use in eq. (17) of EASN
 			
 			//get the actual measurement from the sensor
-			// z_meas << rho_theta.data[2*std::stoi(me)], rho_theta.data[2*std::stoi(me)+1]; 
 			z_meas << this->last_sensor_info.data[0], this->last_sensor_info.data[1];
 					
 			// eq. (17) of EASN    	
@@ -351,7 +350,13 @@ private:
 		// Do estimation
 		this->estimation();
 
-		RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f vx=%.3f vy=%.3f", x_est[0], x_est[1],x_est[2], x_est[3]);
+		if(this->me == "1"){
+			// RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f vx=%.3f vy=%.3f X=%.3f Y=%.3f", x_est[0], x_est[1],
+			// 	x_est[2], x_est[3], this->X, this->Y);
+			// RCLCPP_INFO(get_logger(), "H_meas: %.3f m %.3f rad  Z_meas: %.3f m %.3f rad",
+			// 	h_meas[0], h_meas[1], z_meas[0], z_meas[1]);
+
+		}
 		// this->compute_flocking_cmd();
 
 		// Publish acceleration command 
@@ -371,9 +376,9 @@ private:
 	  estimation algorithm (DT = 0.05 s = 1/20 Hz) */
 	double e_vx_0t, e_vy_0t, u_vx, 
 		u_vy, 
-		x0[3] = {3, 2, -2}, 	// [m] x starting points of drones, used as local origin for the drone
-		y0[3] = {4, -2, 1}, 	// [m] y starting points of drones, used as local origin for the drone
-		DT;						// [s] timestep between rho measurements
+		x0[3] = {0.5, -0.5, -0.5}, 		// [m] x starting points of drones, used as local origin for the drone
+		y0[3] = {0.5,  0.5, -0.5}, 		// [m] y starting points of drones, used as local origin for the drone
+		DT;								// [s] timestep between rho measurements
 
 
 	Matrix4d Y_pred, Y_est, F, Q, P_pred, I_meas, I_meas_nA, I_meas_nB;

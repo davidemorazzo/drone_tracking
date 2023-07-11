@@ -82,12 +82,7 @@ private:
 	void timesync_status_cb(const TimesyncStatus & message) {
 		this->timesync_status = std::make_shared<TimesyncStatus>(std::move(message));};
 	void vehicle_odometry_cb(const VehicleOdometry & message) {
-		this->vehicle_odometry = std::make_shared<VehicleOdometry>(std::move(message));
-		if (this->vehicle_starting_position[0] == NAN){
-			this->vehicle_starting_position[0] = this->vehicle_odometry->position[0];
-			this->vehicle_starting_position[1] = this->vehicle_odometry->position[1];
-			this->vehicle_starting_position[2] = this->vehicle_odometry->position[2];
-		}};
+		this->vehicle_odometry = std::make_shared<VehicleOdometry>(std::move(message));};
 	void estimator_cb(const std_msgs::msg::Float64MultiArray & message);
 
 	/*------ PUBLISHERS ------ */
