@@ -107,8 +107,8 @@ public:
 			
 			//////////////////////// MEASUREMENTS //////////////////////////////
 			
-			X = x_pred(0) - (self_odom.position[0]);// + x0[std::stoi(me)]); //relative position between predicted target and UAV along x axis 
-			Y = x_pred(1) + (self_odom.position[1]);// + y0[std::stoi(me)]); //relative position between predicted target and UAV along y axis 
+			X = x_pred(0) - (self_odom.position[0]); //relative position between predicted target and UAV along x axis 
+			Y = x_pred(1) + (self_odom.position[1]); //relative position between predicted target and UAV along y axis 
 
 			grad_h << X/sqrt(pow(X,2)+pow(Y,2)), Y/sqrt(pow(X,2)+pow(Y,2)), 0, 0,
 				-Y/(pow(X,2)+pow(Y,2))    , X/(pow(X,2)+pow(Y,2))    , 0, 0; // compute gradient of h to use in eq. (17) of EASN
@@ -185,9 +185,9 @@ public:
 		lambda[std::stoi(nA)] = this->nA_odom.position[0];
 		lambda[std::stoi(nB)] = this->nB_odom.position[0];
 		// phi is the y coordinate (lo spero parte 2 ...)
-		phi[std::stoi(me)] = this->self_odom.position[1];
-		phi[std::stoi(nA)] = this->nA_odom.position[1];
-		phi[std::stoi(nB)] = this->nB_odom.position[1];
+		phi[std::stoi(me)] = -this->self_odom.position[1];
+		phi[std::stoi(nA)] = -this->nA_odom.position[1];
+		phi[std::stoi(nB)] = -this->nB_odom.position[1];
 			
 				
 		for (int i = 0; i < 3; ++i){
@@ -195,9 +195,9 @@ public:
 			if( i != std::stoi(me)){
 				// Relative distance from "me" to drone i-th
 				double diff_vec[3] = {
-					this->self_odom.position[0] - this->lambda[i],
-					this->self_odom.position[0] - this->lambda[i],
-					this->self_odom.position[0] - this->lambda[i]
+					this->self_odom.position[0] - this->lambda[i],	// X
+					-this->self_odom.position[1] - this->phi[i],	// Y
+					0.0												// Z    //this->self_odom.position[0] - this->lambda[i]
 				};
 
 				dist[i] = this->vector3_norm(diff_vec);
@@ -205,7 +205,8 @@ public:
 				dist_lambda[i] = this->lambda[std::stoi(me)] - this->lambda[i];		// FIXME: la distanza deve avere segno o no?
 				
 				//compute distance regulator input + integral action on the relative distance --> eq(3) + eq. (8) of EASN
-				u_alpha[i] = (rho_p(sigma_norm(dist[i])/sigma_norm(4.8))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(4)) + k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
+				u_alpha[i] = (rho_p(sigma_norm(dist[i])/sigma_norm(4.8))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(4)) 
+							+ k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
 				//compute x and y components of u_alpha      
 				u_x[i] = u_alpha[i]*dist_lambda[i];
 				u_y[i] = u_alpha[i]*dist_phi[i];
@@ -222,10 +223,11 @@ public:
 			
 	
 		// compute relative distance and relative x and y positions between UAV and TARGET
-		dist_lambda[3] = x_est(0) - (this->self_odom.position[0] + x0[std::stoi(me)]);
-		dist_phi[3] =    x_est(1) - (this->self_odom.position[1] + y0[std::stoi(me)]);
-		dist[3] = sqrt(pow(x_est(0) - (this->self_odom.position[0] + x0[std::stoi(me)]),2) + 
-						pow(x_est(1) - (this->self_odom.position[1] + y0[std::stoi(me)]),2)); 
+		// Y has to be inverted because self_odom ref frame is FRD and x_est is FLU
+		dist_lambda[3] = x_est(0) - (this->self_odom.position[0]); // + x0[std::stoi(me)]);
+		dist_phi[3] =    x_est(1) + (this->self_odom.position[1]); // + y0[std::stoi(me)]);
+		dist[3] = sqrt(pow(x_est(0) - (this->self_odom.position[0]),2) + // + x0[std::stoi(me)]),2) + 
+						pow(x_est(1) + (this->self_odom.position[1]),2));		// + y0[std::stoi(me)]),2)); 
 			
 		
 		
@@ -235,15 +237,23 @@ public:
 		
 		//compute control input along x axis
 		this->cmd_force_x = 
-				0.25 * (u_x[std::stoi(nA)]+u_x[std::stoi(nB)]
-				+ k_d*u_vx + k_abs*(c_1*dist_lambda[3]*rho_int(dist[3]/d_int)
-				+ c_2*(x_est(2)-this->self_odom.velocity[0]) + c_int*e_vx_0t)); 
+				0.25 * (
+				  u_x[std::stoi(nA)]
+				+ u_x[std::stoi(nB)]
+				+ k_d*u_vx 
+				+ k_abs*(c_1*dist_lambda[3]*rho_int(dist[3]/d_int)
+				+ c_2*(x_est(2)-this->self_odom.velocity[0])
+				+ c_int*e_vx_0t)); 
 		
 		//compute control input along y axis
 		this->cmd_force_y = 
-				0.25 * (u_y[std::stoi(nA)]+u_y[std::stoi(nB)]
-				+ k_d*u_vy + k_abs*(c_1*dist_phi[3]*rho_int(dist[3]/d_int) 
-				+ c_2*(x_est(3)-this->self_odom.velocity[1])  + c_int*e_vy_0t));
+				0.25 * (
+				  u_y[std::stoi(nA)]
+				+ u_y[std::stoi(nB)]
+				+ k_d*u_vy 
+				+ k_abs*(c_1*dist_phi[3]*rho_int(dist[3]/d_int) 
+				+ c_2*(x_est(3)-this->self_odom.velocity[1])  
+				+ c_int*e_vy_0t));
 		
 		
 		//discrete version of eq. (9) of EASN.  velocity error between UAV and target. 
@@ -270,9 +280,6 @@ public:
 		// ros::spinOnce();
 		// rate.sleep();
 	}
-
-	double get_force_x(){return this->cmd_force_x;}
-	double get_force_y(){return this->cmd_force_y;}
 
 private:
 	/* -------------------------------------------------------------------------------*/
@@ -357,7 +364,11 @@ private:
 			// 	h_meas[0], h_meas[1], z_meas[0], z_meas[1]);
 
 		}
-		// this->compute_flocking_cmd();
+		this->compute_flocking_cmd();
+		if(this->me == "0"){
+			// RCLCPP_INFO(get_logger(), "acc_x=%.3f m/s2 acc_y=%.3f m/s^2", cmd_force_x, cmd_force_y);
+			RCLCPP_INFO(get_logger(), "u_d[1]=(%.3f  %.3f) u_v=(%.3f  %.3f)", u_x[1], u_y[1], u_vx, u_vy);
+		}
 
 		// Publish acceleration command 
 		std_msgs::msg::Float64MultiArray acc_msg;

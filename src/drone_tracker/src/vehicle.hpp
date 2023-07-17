@@ -57,6 +57,8 @@ private:
 	MissionState current_state, next_state;
 	int mission_cb_cnt = 0;
 	float acc_angle = 0;
+	float flocking_ax = 0.0;
+	float flocking_ay = 0.0;
 
 	rclcpp::QoS sub_qos = rclcpp::QoS(0)
 		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)

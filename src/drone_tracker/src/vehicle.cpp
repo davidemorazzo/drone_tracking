@@ -189,20 +189,20 @@ void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
 }
 
 bool Vehicle::mission_func(){
-	if (mission_cb_cnt < 50){
+	if (mission_cb_cnt < 30){
 		publish_pos_setpoint(0.0, 0.0, -2, 0);
 	}else{
-		publish_pos_setpoint(1.0, 0.0, -2, 0);
+		// publish_pos_setpoint(0.3, 0.3, -2, 0);
+		/* Enable flocking algorithm command */
+		publish_hor_acc_setpoint(this->flocking_ax, this->flocking_ay, -2.0, 0);
 	}
-	// publish_pos_setpoint(-0.5, 0, -2, 0);
-	// return mission_cb_cnt++ > 100;
 	mission_cb_cnt++;
 	return false;
 }
 
 /* When a new acceleration command is available from the estimator, it is published to the autopilot */
 void Vehicle::estimator_cb(const std_msgs::msg::Float64MultiArray & message){
-	float ax = message.data[0];
-	float ay = message.data[1];
-	publish_hor_acc_setpoint(ax, ay, -1.5, 0);
+	// ay is inverted to manage FLU=>FRD transform
+	this->flocking_ax = message.data[0];
+	this->flocking_ay = -message.data[1];
 }
