@@ -6,6 +6,12 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_ros/transform_broadcaster.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+#include "geometry_msgs/msg/transform_stamped.hpp"
+
 #include "opencv2/opencv.hpp"
 #include "opencv2/core/quaternion.hpp"
 #include "opencv2/calib3d.hpp"
@@ -30,13 +36,6 @@ public:
 			std::string(ros_namespace + "/openmv_serial"), 10, 
 			std::bind(& Camera::image_cb, this, _1));
 
-		odom_sub = create_subscription<px4_msgs::msg::VehicleOdometry>(
-			std::string(ros_namespace + "/fmu/in/vehicle_visual_odometry"), 10, 
-			std::bind(& Camera::odometry_cb, this, _1));
-
-		marker_pose_pub = create_publisher<geometry_msgs::msg::PointStamped>(
-			std::string(ros_namespace + "/marker_pose"), 10);
-
 		rho_theta_pub = create_publisher<std_msgs::msg::Float64MultiArray>(
 			std::string(ros_namespace + "/sensor_measure"), 10);
 
@@ -55,70 +54,43 @@ public:
 			cameraMatrix.at<float>(1,2), cameraMatrix.at<float>(2,0),cameraMatrix.at<float>(2,1), cameraMatrix.at<float>(2,2));
 		RCLCPP_INFO(get_logger(), "Distorsion  matrix %f %f %f %f %f", distCoeffs.at<float>(0,0),
 			distCoeffs.at<float>(1,0), distCoeffs.at<float>(2,0), distCoeffs.at<float>(3,0), distCoeffs.at<float>(4,0));
+
+		this->tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+		this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    	this->tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 	};
 
 private:
 	std::string ros_namespace;
-	sensor_msgs::msg::Image::SharedPtr last_image = nullptr;
-	float markerLength = 0.23; // [mm]
 	cv::Mat cameraMatrix, distCoeffs, cameraMatrixInv;
-	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odom_sub;
 	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr serial_image_sub;
-	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr marker_pose_pub;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr rho_theta_pub;
 	float vehicle_pos[3] = {0.0, 0.0, 0.0};
 	float vehicle_q[4] = {0.0, 0.0, 0.0, 0.0};
-	std::string dev_name = "/dev/ttyUSB0";
-	 
 
-
-	rclcpp::QoS sub_qos = rclcpp::QoS(0)
-		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
-		.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL)
-		.history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
-
-	rclcpp::QoS pub_qos = rclcpp::QoS(10)
-		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
-		.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE)
-		.history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
-
-	void odometry_cb(const px4_msgs::msg::VehicleOdometry &msg){
-		this->vehicle_pos[0] = msg.position[0];
-		this->vehicle_pos[1] = msg.position[1];
-		this->vehicle_pos[2] = msg.position[2];
-		this->vehicle_q[0] = msg.q[0];
-		this->vehicle_q[1] = msg.q[1];
-		this->vehicle_q[2] = msg.q[2];
-		this->vehicle_q[3] = msg.q[3];
-	}
+	std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
+	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+  	std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 	
 	void image_cb(const std_msgs::msg::Float64MultiArray &msg){
 		/* Markers pose estimation */
 		if(! msg.data.empty()){
+			try{
+				cv::Mat camera_mtx = this->cameraTrasl(msg.data);
+				this->broadcast_marker_tf(
+					camera_mtx.at<float>(0, 3),
+					camera_mtx.at<float>(1, 3),
+					-camera_mtx.at<float>(2, 3));
+			}catch (...){}
 
-			cv::Mat camera_mtx = this->cameraTrasl(msg.data);
-			cv::Mat drone_mtx = this->drone_matrix();
-			cv::Mat marker_pose = camera_mtx * drone_mtx;
-			// std::string out = "";
-			// out << camera_mtx;
-			// RCLCPP_INFO(get_logger(), out.c_str());
-
-			geometry_msgs::msg::PointStamped point;
-			point.header.frame_id = "map";
-			point.header.stamp = this->now();
-			point.point.x = marker_pose.at<float>(0,3);
-			point.point.y = marker_pose.at<float>(1,3);
-			point.point.z = marker_pose.at<float>(2,3);
-			this->marker_pose_pub->publish(point);
-
-			/* Polar coordinates */
-			std::vector<float> rho_theta = this->polar_coordinates(marker_pose, drone_mtx);
-			// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
-			std_msgs::msg::Float64MultiArray rho_theta_msg;
-			rho_theta_msg.data.push_back(float(rho_theta[0]));
-			rho_theta_msg.data.push_back(float(rho_theta[1]));
-			rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
-			this->rho_theta_pub->publish(rho_theta_msg);
+			// /* Polar coordinates */
+			// std::vector<float> rho_theta = this->polar_coordinates(marker_pose, drone_mtx);
+			// // RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
+			// std_msgs::msg::Float64MultiArray rho_theta_msg;
+			// rho_theta_msg.data.push_back(float(rho_theta[0]));
+			// rho_theta_msg.data.push_back(float(rho_theta[1]));
+			// rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
+			// this->rho_theta_pub->publish(rho_theta_msg);
 		}
 		
 	};
@@ -137,9 +109,14 @@ private:
 
 			// RCLCPP_INFO(get_logger(), "Undistorted x=%.1f px y=%.1f px", undistorted_points[0].x, undistorted_points[0].y);
 			
-			image_plane.at<float>(0,0) = center_point.x * -this->vehicle_pos[2];
-			image_plane.at<float>(1,0) = center_point.y * -this->vehicle_pos[2];
-			image_plane.at<float>(2,0) = -this->vehicle_pos[2];
+			geometry_msgs::msg::TransformStamped t;
+			t = tf_buffer_->lookupTransform(
+            	"map", "drone1",
+            	tf2::TimePointZero);
+
+			image_plane.at<float>(0,0) = center_point.x * t.transform.translation.z;
+			image_plane.at<float>(1,0) = center_point.y * t.transform.translation.z;
+			image_plane.at<float>(2,0) = t.transform.translation.z;
 
 			// /*Test height*/
 			// image_plane.at<float>(0,0) = center_point.x * 0.75;
@@ -150,23 +127,13 @@ private:
 			coord = this->cameraMatrixInv * image_plane;
 
 			cv::Matx<float, 4, 4> camera_matrix = cv::Matx<float, 4, 4>::eye();
-			camera_matrix(0,3) = -coord.at<float>(1,0);
-			camera_matrix(1,3) = -coord.at<float>(0,0);
-			camera_matrix(2,3) = -coord.at<float>(2,0);
+			camera_matrix(0,3) = coord.at<float>(1,0);
+			camera_matrix(1,3) = coord.at<float>(0,0);
+			camera_matrix(2,3) = coord.at<float>(2,0);
 
 			return cv::Mat(camera_matrix);
 		}	
 		return out;
-	}
-
-	cv::Mat drone_matrix(){
-		// cv::Mat drone_matrix = cv::Mat::eye(4,4,CV_32F);
-		cv::Quat<float> drone_quaternion = cv::Quat<float>(vehicle_q[0],vehicle_q[1],vehicle_q[2],vehicle_q[3]);
-		cv::Matx<float, 4, 4> drone_matrix = drone_quaternion.toRotMat4x4();
-		drone_matrix(0,3) =  this->vehicle_pos[0]; // add 15cm for camera position
-		drone_matrix(1,3) = -this->vehicle_pos[1];
-		drone_matrix(2,3) = -this->vehicle_pos[2];
-		return cv::Mat(drone_matrix);
 	}
 
 	std::vector<float> polar_coordinates(cv::Mat marker_mtx, cv::Mat drone_mtx){
@@ -178,6 +145,39 @@ private:
 		result.push_back(rho);
 		result.push_back(theta);
 		return result;
+	}
+
+	void broadcast_camera_tf(){
+		geometry_msgs::msg::TransformStamped t;
+		tf2::Quaternion q;
+		q.setEuler(3.1415, 3.1415, 0.0);
+		t.header.stamp = this->get_clock()->now();
+		t.header.frame_id = "drone1";
+		t.child_frame_id = "camera";
+		t.transform.translation.x = 0.07;
+		t.transform.translation.y = 0.0;
+		t.transform.translation.z = 0.0;
+		t.transform.rotation.x = q.x();
+		t.transform.rotation.y = q.y();
+		t.transform.rotation.z = q.z();
+		t.transform.rotation.w = q.w();
+		this->tf_broadcaster->sendTransform(t);
+	}
+
+	void broadcast_marker_tf(float x, float y, float z){
+		geometry_msgs::msg::TransformStamped t;
+		tf2::Quaternion q;
+		t.header.stamp = this->get_clock()->now();
+		t.header.frame_id = "camera";
+		t.child_frame_id = "marker";
+		t.transform.translation.x = x;
+		t.transform.translation.y = y;
+		t.transform.translation.z = z;
+		t.transform.rotation.x = 0.0;
+		t.transform.rotation.y = 0.0;
+		t.transform.rotation.z = 0.0;
+		t.transform.rotation.w = 1.0;
+		this->tf_broadcaster->sendTransform(t);
 	}
 	
 };
