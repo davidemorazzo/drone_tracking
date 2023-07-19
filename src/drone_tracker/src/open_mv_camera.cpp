@@ -8,6 +8,7 @@
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/core/quaternion.hpp"
+#include "opencv2/calib3d.hpp"
 
 
 using namespace std::chrono_literals;
@@ -52,8 +53,8 @@ public:
 		RCLCPP_INFO(get_logger(), "Camera matrix %f %f %f %f %f %f %f %f %f", cameraMatrix.at<float>(0,0),
 			cameraMatrix.at<float>(0,1), cameraMatrix.at<float>(0,2), cameraMatrix.at<float>(1,0), cameraMatrix.at<float>(1,1), 
 			cameraMatrix.at<float>(1,2), cameraMatrix.at<float>(2,0),cameraMatrix.at<float>(2,1), cameraMatrix.at<float>(2,2));
-		RCLCPP_INFO(get_logger(), "Distorsion  matrix %f %f %f %f %f", distCoeffs.at<double>(0,0),
-			distCoeffs.at<double>(1,0), distCoeffs.at<double>(2,0), distCoeffs.at<double>(3,0), distCoeffs.at<double>(4,0));
+		RCLCPP_INFO(get_logger(), "Distorsion  matrix %f %f %f %f %f", distCoeffs.at<float>(0,0),
+			distCoeffs.at<float>(1,0), distCoeffs.at<float>(2,0), distCoeffs.at<float>(3,0), distCoeffs.at<float>(4,0));
 	};
 
 private:
@@ -98,8 +99,8 @@ private:
 			cv::Mat camera_mtx = this->cameraTrasl(msg.data);
 			cv::Mat drone_mtx = this->drone_matrix();
 			cv::Mat marker_pose = camera_mtx * drone_mtx;
-			// std::string out = "Marker mtx: ";
-			// out << marker_pose;
+			// std::string out = "";
+			// out << camera_mtx;
 			// RCLCPP_INFO(get_logger(), out.c_str());
 
 			geometry_msgs::msg::PointStamped point;
@@ -124,15 +125,26 @@ private:
 
 	cv::Mat cameraTrasl(std::vector<double> info){
 		cv::Mat out;
-		if (int(info.size() > 3)){
+		if (int(info.size() >= 3)){
 			cv::Mat image_plane = cv::Mat(3, 1, CV_32F);
 			cv::Point2f center_point(info[1], info[2]);
+			RCLCPP_INFO(get_logger(), "Point x=%.1f px y=%.1f px", center_point.x, center_point.y);
 
-			cv::undistortPoints()
+			/* Undistort point */
+			// std::vector<cv::Point2d> points, undistorted_points;
+			// points.push_back(center_point);
+			// cv::undistortPoints(points, undistorted_points, this->cameraMatrix, this->distCoeffs);
+
+			// RCLCPP_INFO(get_logger(), "Undistorted x=%.1f px y=%.1f px", undistorted_points[0].x, undistorted_points[0].y);
 			
 			image_plane.at<float>(0,0) = center_point.x * -this->vehicle_pos[2];
 			image_plane.at<float>(1,0) = center_point.y * -this->vehicle_pos[2];
 			image_plane.at<float>(2,0) = -this->vehicle_pos[2];
+
+			// /*Test height*/
+			// image_plane.at<float>(0,0) = center_point.x * 0.75;
+			// image_plane.at<float>(1,0) = center_point.y * 0.75;
+			// image_plane.at<float>(2,0) = 0.75;
 			
 			cv::Mat coord = cv::Mat(CV_32F,3,1); 
 			coord = this->cameraMatrixInv * image_plane;

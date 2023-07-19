@@ -38,6 +38,17 @@ $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include>)
 target_compile_features(camera PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
+############ OPENMV CAMERA NODE ###################
+add_executable(openmv_camera 
+  src/open_mv_camera.cpp)
+
+target_link_libraries(openmv_camera ${OpenCV_LIBS})
+ament_target_dependencies(openmv_camera rclcpp std_msgs sensor_msgs px4_msgs geometry_msgs)
+target_include_directories(openmv_camera PUBLIC
+$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+$<INSTALL_INTERFACE:include>)
+target_compile_features(openmv_camera PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
 ############## VEHICLE NODE ######################
 add_executable(vehicle 
   src/vehicle.cpp)
@@ -58,7 +69,7 @@ target_include_directories(estimator PUBLIC
   $<INSTALL_INTERFACE:include>)
 target_compile_features(estimator PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS estimator vehicle camera
+install(TARGETS estimator vehicle camera openmv_camera
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
