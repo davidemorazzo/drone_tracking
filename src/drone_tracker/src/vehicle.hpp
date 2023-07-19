@@ -4,6 +4,12 @@
 #include "rclcpp/rclcpp.hpp"
 #include <memory>
 #include <chrono>
+
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_ros/transform_broadcaster.h"
+#include "tf2_ros/static_transform_broadcaster.h"
+#include "geometry_msgs/msg/transform_stamped.hpp"
+
 #include "px4_msgs/msg/vehicle_status.hpp"
 #include "px4_msgs/msg/vehicle_odometry.hpp"
 #include "px4_msgs/msg/vehicle_attitude.hpp"
@@ -52,6 +58,9 @@ public:
 	void publish_hor_acc_setpoint(float ax, float ay, float z, float yaw);			// Publish a setpoint to control horizontal acceleration
 	void publish_pos_setpoint(float x, float y, float z, float yaw);				// Publish a position setpoint
 
+	void broadcast_drone_tf(VehicleOdometry msg);
+	void broadcast_camera_tf();
+
 private:
 	std::string ros_namespace;
 	MissionState current_state, next_state;
@@ -83,8 +92,7 @@ private:
 		this->vehicle_control_mode = std::make_shared<VehicleControlMode>(std::move(message));};
 	void timesync_status_cb(const TimesyncStatus & message) {
 		this->timesync_status = std::make_shared<TimesyncStatus>(std::move(message));};
-	void vehicle_odometry_cb(const VehicleOdometry & message) {
-		this->vehicle_odometry = std::make_shared<VehicleOdometry>(std::move(message));};
+	void vehicle_odometry_cb(const VehicleOdometry & message);
 	void estimator_cb(const std_msgs::msg::Float64MultiArray & message);
 
 	/*------ PUBLISHERS ------ */
@@ -92,6 +100,8 @@ private:
 	rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr vehicle_command_pub;
 	rclcpp::Publisher<px4_msgs::msg::OffboardControlMode>::SharedPtr offboard_control_mode_pub;
 	rclcpp::Publisher<px4_msgs::msg::TrajectorySetpoint>::SharedPtr trajectory_setpoint_pub;
+	std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
+	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
 	
 	/*-------- TIMERS ----------*/
 	rclcpp::TimerBase::SharedPtr mission_timer = this->create_wall_timer(500ms, std::bind(& Vehicle::mission_update, this));

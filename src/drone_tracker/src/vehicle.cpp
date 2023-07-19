@@ -49,6 +49,11 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 	this->current_state = MissionState::IDLE;
 	this->next_state = MissionState::IDLE;
 
+	this->tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+	this->tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+
+	this->broadcast_camera_tf();
+
 	RCLCPP_INFO(this->get_logger(), "Vehicle initialized");
 }
 
@@ -206,3 +211,40 @@ void Vehicle::estimator_cb(const std_msgs::msg::Float64MultiArray & message){
 	this->flocking_ax = message.data[0];
 	this->flocking_ay = -message.data[1];
 }
+
+void Vehicle::vehicle_odometry_cb(const VehicleOdometry & message) {
+	this->vehicle_odometry = std::make_shared<VehicleOdometry>(std::move(message));
+	this->broadcast_drone_tf(message);
+	};
+
+void Vehicle::broadcast_drone_tf(VehicleOdometry msg){
+    geometry_msgs::msg::TransformStamped t;
+    t.header.stamp = this->get_clock()->now();
+    t.header.frame_id = "map";
+    t.child_frame_id = this->ros_namespace;
+    t.transform.translation.x =  msg.position[0];
+    t.transform.translation.y = -msg.position[1];
+    t.transform.translation.z = -msg.position[2];
+    t.transform.rotation.x =  msg.q[1];
+    t.transform.rotation.y = -msg.q[2];
+    t.transform.rotation.z = -msg.q[3];
+    t.transform.rotation.w =  msg.q[0];
+    this->tf_broadcaster->sendTransform(t);
+  }
+
+void Vehicle::broadcast_camera_tf(){
+	geometry_msgs::msg::TransformStamped t;
+	tf2::Quaternion q;
+	q.setEuler(3.1415, 3.1415, 0.0);
+	t.header.stamp = this->get_clock()->now();
+	t.header.frame_id = this->ros_namespace;
+	t.child_frame_id = this->ros_namespace + "/camera";
+	t.transform.translation.x = 0.07;
+	t.transform.translation.y = 0.0;
+	t.transform.translation.z = 0.0;
+	t.transform.rotation.x = q.x();
+	t.transform.rotation.y = q.y();
+	t.transform.rotation.z = q.z();
+	t.transform.rotation.w = q.w();
+	this->tf_static_broadcaster_->sendTransform(t);
+	}

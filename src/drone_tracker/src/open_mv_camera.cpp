@@ -1,16 +1,15 @@
-#include "rclcpp/rclcpp.hpp"
 #include <memory>
 #include <chrono>
+#include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
-#include "px4_msgs/msg/vehicle_odometry.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
+#include "geometry_msgs/msg/transform_stamped.hpp"
 
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
-#include "geometry_msgs/msg/transform_stamped.hpp"
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/core/quaternion.hpp"
@@ -81,16 +80,19 @@ private:
 					camera_mtx.at<float>(0, 3),
 					camera_mtx.at<float>(1, 3),
 					-camera_mtx.at<float>(2, 3));
-			}catch (...){}
 
-			// /* Polar coordinates */
-			// std::vector<float> rho_theta = this->polar_coordinates(marker_pose, drone_mtx);
-			// // RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
-			// std_msgs::msg::Float64MultiArray rho_theta_msg;
-			// rho_theta_msg.data.push_back(float(rho_theta[0]));
-			// rho_theta_msg.data.push_back(float(rho_theta[1]));
-			// rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
-			// this->rho_theta_pub->publish(rho_theta_msg);
+				/* Polar coordinates */
+				std::vector<float> rho_theta = this->polar_coordinates(
+					this->ros_namespace, 
+					this->ros_namespace + "/marker");
+				// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
+				std_msgs::msg::Float64MultiArray rho_theta_msg;
+				rho_theta_msg.data.push_back(float(rho_theta[0]));
+				rho_theta_msg.data.push_back(float(rho_theta[1]));
+				rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
+				this->rho_theta_pub->publish(rho_theta_msg);
+			
+			}catch (...){}
 		}
 		
 	};
@@ -111,7 +113,7 @@ private:
 			
 			geometry_msgs::msg::TransformStamped t;
 			t = tf_buffer_->lookupTransform(
-            	"map", "drone1",
+            	"map", this->ros_namespace,
             	tf2::TimePointZero);
 
 			image_plane.at<float>(0,0) = center_point.x * t.transform.translation.z;
@@ -136,40 +138,27 @@ private:
 		return out;
 	}
 
-	std::vector<float> polar_coordinates(cv::Mat marker_mtx, cv::Mat drone_mtx){
-		float delta_x = marker_mtx.at<float>(0,3) - drone_mtx.at<float>(0,3);
-		float delta_y = marker_mtx.at<float>(1,3) - drone_mtx.at<float>(1,3);
-		float rho = sqrt(pow(delta_x,2) + pow(delta_y,2));
-		float theta = atan2(delta_y, delta_x);
+	std::vector<float> polar_coordinates(std::string parent_id, std::string child_id){
+		geometry_msgs::msg::TransformStamped t;
+			t = tf_buffer_->lookupTransform(
+            	parent_id, child_id,
+            	tf2::TimePointZero);
+		
+		float rho = sqrt(pow(t.transform.translation.x,2) + pow(t.transform.translation.y,2));
+		float theta = atan2(t.transform.translation.y, t.transform.translation.x);
+		
 		std::vector<float> result;
 		result.push_back(rho);
 		result.push_back(theta);
 		return result;
 	}
 
-	void broadcast_camera_tf(){
-		geometry_msgs::msg::TransformStamped t;
-		tf2::Quaternion q;
-		q.setEuler(3.1415, 3.1415, 0.0);
-		t.header.stamp = this->get_clock()->now();
-		t.header.frame_id = "drone1";
-		t.child_frame_id = "camera";
-		t.transform.translation.x = 0.07;
-		t.transform.translation.y = 0.0;
-		t.transform.translation.z = 0.0;
-		t.transform.rotation.x = q.x();
-		t.transform.rotation.y = q.y();
-		t.transform.rotation.z = q.z();
-		t.transform.rotation.w = q.w();
-		this->tf_broadcaster->sendTransform(t);
-	}
-
 	void broadcast_marker_tf(float x, float y, float z){
 		geometry_msgs::msg::TransformStamped t;
 		tf2::Quaternion q;
 		t.header.stamp = this->get_clock()->now();
-		t.header.frame_id = "camera";
-		t.child_frame_id = "marker";
+		t.header.frame_id = this->ros_namespace + "/camera";
+		t.child_frame_id = this->ros_namespace + "/marker";
 		t.transform.translation.x = x;
 		t.transform.translation.y = y;
 		t.transform.translation.z = z;

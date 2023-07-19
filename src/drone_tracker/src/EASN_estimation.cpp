@@ -218,16 +218,16 @@ public:
 		u_vx = -(this->self_odom.velocity[0] - this->nA_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(4.8)) 
 			   -(this->self_odom.velocity[0] - this->nB_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8)); 
 		//compute y component of eq. (5) in EASN 
-		u_vy = -(this->self_odom.velocity[1] - this->nA_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(4.8))
-			   -(this->self_odom.velocity[1] - this->nB_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8));
+		u_vy =  (this->self_odom.velocity[1] - this->nA_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(4.8))
+			   +(this->self_odom.velocity[1] - this->nB_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8));
 			
 	
 		// compute relative distance and relative x and y positions between UAV and TARGET
 		// Y has to be inverted because self_odom ref frame is FRD and x_est is FLU
-		dist_lambda[3] = x_est(0) - (this->self_odom.position[0]); // + x0[std::stoi(me)]);
-		dist_phi[3] =    x_est(1) + (this->self_odom.position[1]); // + y0[std::stoi(me)]);
-		dist[3] = sqrt(pow(x_est(0) - (this->self_odom.position[0]),2) + // + x0[std::stoi(me)]),2) + 
-						pow(x_est(1) + (this->self_odom.position[1]),2));		// + y0[std::stoi(me)]),2)); 
+		dist_lambda[3] = x_est(0) - (this->self_odom.position[0]); 
+		dist_phi[3] =    x_est(1) + (this->self_odom.position[1]); 
+		dist[3] = sqrt(pow(x_est(0) - (this->self_odom.position[0]),2) + 
+						pow(x_est(1) + (this->self_odom.position[1]),2));
 			
 		
 		
@@ -252,13 +252,13 @@ public:
 				+ u_y[std::stoi(nB)]
 				+ k_d*u_vy 
 				+ k_abs*(c_1*dist_phi[3]*rho_int(dist[3]/d_int) 
-				+ c_2*(x_est(3)-this->self_odom.velocity[1])  
+				+ c_2*(x_est(3)+this->self_odom.velocity[1])  
 				+ c_int*e_vy_0t));
 		
 		
 		//discrete version of eq. (9) of EASN.  velocity error between UAV and target. 
 		e_vx_0t = k_abs * ((x_est(2) - this->self_odom.velocity[0])) + e_vx_0t;
-		e_vy_0t = k_abs * ((x_est(3) - this->self_odom.velocity[1])) + e_vy_0t;
+		e_vy_0t = k_abs * ((x_est(3) + this->self_odom.velocity[1])) + e_vy_0t;
 			
 
 		
@@ -387,8 +387,8 @@ private:
 	  estimation algorithm (DT = 0.05 s = 1/20 Hz) */
 	double e_vx_0t, e_vy_0t, u_vx, 
 		u_vy, 
-		x0[3] = {0.5, -0.5, -0.5}, 		// [m] x starting points of drones, used as local origin for the drone
-		y0[3] = {0.5,  0.5, -0.5}, 		// [m] y starting points of drones, used as local origin for the drone
+		// x0[3] = {0.5, -0.5, -0.5}, 		// [m] x starting points of drones, used as local origin for the drone
+		// y0[3] = {0.5,  0.5, -0.5}, 		// [m] y starting points of drones, used as local origin for the drone
 		DT;								// [s] timestep between rho measurements
 
 

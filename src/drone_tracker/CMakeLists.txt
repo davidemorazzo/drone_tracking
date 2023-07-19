@@ -56,7 +56,7 @@ target_compile_features(openmv_camera PUBLIC c_std_99 cxx_std_17)  # Require C99
 add_executable(vehicle 
   src/vehicle.cpp)
 
-ament_target_dependencies(vehicle px4_msgs rclcpp std_msgs)
+ament_target_dependencies(vehicle px4_msgs rclcpp std_msgs tf2 tf2_ros)
 target_include_directories(vehicle PUBLIC
 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include>)
