@@ -5,6 +5,12 @@
 #include "px4_msgs/msg/vehicle_odometry.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
+#include "geometry_msgs/msg/transform_stamped.hpp"
+
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_ros/transform_broadcaster.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/core/quaternion.hpp"
@@ -29,13 +35,6 @@ public:
 		image_sub = create_subscription<sensor_msgs::msg::Image>(
 			std::string(ros_namespace + "/camera/image_raw"), 10, 
 			std::bind(& Camera::image_cb, this, _1));
-		
-		odom_sub = create_subscription<px4_msgs::msg::VehicleOdometry>(
-			std::string(ros_namespace + "/fmu/in/vehicle_visual_odometry"), 10, 
-			std::bind(& Camera::odometry_cb, this, _1));
-
-		marker_pose_pub = create_publisher<geometry_msgs::msg::PointStamped>(
-			std::string(ros_namespace + "/marker_pose"), 10);
 
 		rho_theta_pub = create_publisher<std_msgs::msg::Float64MultiArray>(
 			std::string(ros_namespace + "/sensor_measure"), 10);
@@ -55,6 +54,10 @@ public:
 			cameraMatrix.at<float>(1,2), cameraMatrix.at<float>(2,0),cameraMatrix.at<float>(2,1), cameraMatrix.at<float>(2,2));
 		RCLCPP_INFO(get_logger(), "Distorsion  matrix %f %f %f %f %f", distCoeffs.at<double>(0,0),
 			distCoeffs.at<double>(1,0), distCoeffs.at<double>(2,0), distCoeffs.at<double>(3,0), distCoeffs.at<double>(4,0));
+
+		this->tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+		this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+    	this->tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 	};
 
 private:
@@ -64,12 +67,13 @@ private:
 	float markerLength = 0.23; // [mm]
 	cv::Mat cameraMatrix, distCoeffs, cameraMatrixInv;
 	rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub;
-	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr odom_sub;
-	rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr marker_pose_pub;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr rho_theta_pub;
 	float vehicle_pos[3] = {0.0, 0.0, 0.0};
 	float vehicle_q[4] = {0.0, 0.0, 0.0, 0.0};
-	 
+
+	std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
+	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
+  	std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 
 
 	rclcpp::QoS sub_qos = rclcpp::QoS(0)
@@ -111,22 +115,16 @@ private:
 		if(! markerCorners.empty()){
 
 			cv::Mat camera_mtx = this->cameraTrasl(markerCorners.at(0));
-			cv::Mat drone_mtx = this->drone_matrix();
-			cv::Mat marker_pose = camera_mtx * drone_mtx;
-			// std::string out = "Marker mtx: ";
-			// out << marker_pose;
-			// RCLCPP_INFO(get_logger(), out.c_str());
 
-			geometry_msgs::msg::PointStamped point;
-			point.header.frame_id = "map";
-			point.header.stamp = this->now();
-			point.point.x = marker_pose.at<float>(0,3);
-			point.point.y = marker_pose.at<float>(1,3);
-			point.point.z = marker_pose.at<float>(2,3);
-			this->marker_pose_pub->publish(point);
+			this->broadcast_marker_tf(
+				-camera_mtx.at<float>(0,3),						
+				-camera_mtx.at<float>(1,3),					
+				camera_mtx.at<float>(2,3)						
+			);
 
 			/* Polar coordinates */
-			std::vector<float> rho_theta = this->polar_coordinates(marker_pose, drone_mtx);
+			std::vector<float> rho_theta = this->polar_coordinates(
+				"map", this->ros_namespace.substr(1) + "/camera");
 			// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
 			std_msgs::msg::Float64MultiArray rho_theta_msg;
 			rho_theta_msg.data.push_back(float(rho_theta[0]));
@@ -140,14 +138,22 @@ private:
 	cv::Mat cameraTrasl(std::vector<cv::Point2f> points){
 		cv::Mat out;
 		if (int(points.size() == 4)){
+			/*Camera position*/
+			geometry_msgs::msg::TransformStamped camera_tf;
+			std::string camera_frame_id = this->ros_namespace.substr(1) + "/camera";
+			camera_tf = tf_buffer_->lookupTransform(
+            	"map", camera_frame_id,
+            	tf2::TimePointZero);
+
 			cv::Mat image_plane = cv::Mat(3, 1, CV_32F);
 			cv::Point2f center_point;
 			center_point = points[0] + points[2];
 			center_point = center_point / 2;
-			
-			image_plane.at<float>(0,0) = center_point.x * -this->vehicle_pos[2];
-			image_plane.at<float>(1,0) = center_point.y * -this->vehicle_pos[2];
-			image_plane.at<float>(2,0) = -this->vehicle_pos[2];
+
+			float camera_height = camera_tf.transform.translation.z;
+			image_plane.at<float>(0,0) = center_point.x * camera_height;
+			image_plane.at<float>(1,0) = center_point.y * camera_height;
+			image_plane.at<float>(2,0) = camera_height;
 			
 			cv::Mat coord = cv::Mat(CV_32F,3,1); 
 			coord = this->cameraMatrixInv * image_plane;
@@ -172,15 +178,35 @@ private:
 		return cv::Mat(drone_matrix);
 	}
 
-	std::vector<float> polar_coordinates(cv::Mat marker_mtx, cv::Mat drone_mtx){
-		float delta_x = marker_mtx.at<float>(0,3) - drone_mtx.at<float>(0,3);
-		float delta_y = marker_mtx.at<float>(1,3) - drone_mtx.at<float>(1,3);
-		float rho = sqrt(pow(delta_x,2) + pow(delta_y,2));
-		float theta = atan2(delta_y, delta_x);
+	std::vector<float> polar_coordinates(std::string parent_id, std::string child_id){
+		geometry_msgs::msg::TransformStamped t;
+			t = tf_buffer_->lookupTransform(
+            	parent_id, child_id,
+            	tf2::TimePointZero);
+		
+		float rho = sqrt(pow(t.transform.translation.x,2) + pow(t.transform.translation.y,2));
+		float theta = atan2(t.transform.translation.y, t.transform.translation.x);
+		
 		std::vector<float> result;
 		result.push_back(rho);
 		result.push_back(theta);
 		return result;
+	}
+
+	void broadcast_marker_tf(float x, float y, float z){
+		geometry_msgs::msg::TransformStamped t;
+		tf2::Quaternion q;
+		t.header.stamp = this->get_clock()->now();
+		t.header.frame_id = this->ros_namespace + "/camera";
+		t.child_frame_id = this->ros_namespace + "/marker";
+		t.transform.translation.x = x;
+		t.transform.translation.y = y;
+		t.transform.translation.z = z;
+		t.transform.rotation.x = 0.0;
+		t.transform.rotation.y = 0.0;
+		t.transform.rotation.z = 0.0;
+		t.transform.rotation.w = 1.0;
+		this->tf_broadcaster->sendTransform(t);
 	}
 	
 };
