@@ -1,9 +1,7 @@
 /*ROS 2*/
-#include <memory>
 #include <rclcpp/rclcpp.hpp>
 #include "geometry_msgs//msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
-#include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/bool.hpp"
 
@@ -11,6 +9,8 @@
 #include "px4_msgs/msg/vehicle_odometry.hpp"
 
 /* STD LIBRARIES */
+#include <memory>
+#include <chrono>
 #include <stdio.h>
 #include <math.h>
 #include <bits/stdc++.h>
@@ -18,6 +18,7 @@
 #include <Eigen/Dense>
 
 using namespace Eigen;
+using namespace std::chrono_literals;
 using std::placeholders::_1;
 
 rclcpp::QoS px4_sub_qos = rclcpp::QoS(0)
@@ -41,6 +42,8 @@ public:
 			
 		this->generate_subscribers();
 		this->generate_publishers();
+
+		this->flocking_timer = this->create_wall_timer(50ms, std::bind(& EASN_estimation::flocking_cb, this));
 
 		// Variable initialization
 		this->lambda = {0, 0, 0, 0};     
@@ -179,12 +182,11 @@ public:
 	void compute_flocking_cmd(){	
 		///////////////////////////////   FLOCKING ALGORITHM   ////////////////////////////////////
 
-		// FIXME: possibile errore tra scambio di X e Y
-		// lambda is the X coordinate (lo spero...) 
+		// lambda is the X coordinate in FLU 
 		lambda[std::stoi(me)] = this->self_odom.position[0];
 		lambda[std::stoi(nA)] = this->nA_odom.position[0];
 		lambda[std::stoi(nB)] = this->nB_odom.position[0];
-		// phi is the y coordinate (lo spero parte 2 ...)
+		// phi is the y coordinate in FLU
 		phi[std::stoi(me)] = -this->self_odom.position[1];
 		phi[std::stoi(nA)] = -this->nA_odom.position[1];
 		phi[std::stoi(nB)] = -this->nB_odom.position[1];
@@ -201,25 +203,29 @@ public:
 				};
 
 				dist[i] = this->vector3_norm(diff_vec);
-				dist_phi[i] = this->phi[std::stoi(me)] - this->phi[i];				// FIXME: la distanza deve avere segno o no?
-				dist_lambda[i] = this->lambda[std::stoi(me)] - this->lambda[i];		// FIXME: la distanza deve avere segno o no?
+				dist_phi[i] = - this->phi[std::stoi(me)] + this->phi[i];		
+				dist_lambda[i] = - this->lambda[std::stoi(me)] + this->lambda[i];
 				
 				//compute distance regulator input + integral action on the relative distance --> eq(3) + eq. (8) of EASN
-				u_alpha[i] = (rho_p(sigma_norm(dist[i])/sigma_norm(4.8))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(4)) 
+				// u_alpha[i] = (rho_p(sigma_norm(dist[i])/sigma_norm(4.8))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(4)) 
+							// + k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
+				u_alpha[i] = -(rho_p(sigma_norm(dist[i])/sigma_norm(r_comm))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(target_distance)) 
 							+ k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
+				
 				//compute x and y components of u_alpha      
 				u_x[i] = u_alpha[i]*dist_lambda[i];
 				u_y[i] = u_alpha[i]*dist_phi[i];
 				//compute the discrete integral of error in relative distance (eq. (7) of EASN).  the "bump" function is needed to reset the error when communication is lost
-				e_r[i] = (phi_p(sigma_norm(dist[i])-sigma_norm(4)) + e_r[i])*bump(sigma_norm(dist[i])/sigma_norm(4.8)); 
+				// e_r[i] = (phi_p(sigma_norm(dist[i])-sigma_norm(target_distance)) + e_r[i])*bump(sigma_norm(dist[i])/sigma_norm(r_comm)); 
+				e_r[i] = (phi_p(sigma_norm(dist[i])-sigma_norm(target_distance)) + e_r[i])*bump(sigma_norm(dist[i])/sigma_norm(r_comm)); 
 			}}
 		
 		//compute x component of eq. (5) in EASN    
-		u_vx = -(this->self_odom.velocity[0] - this->nA_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(4.8)) 
-			   -(this->self_odom.velocity[0] - this->nB_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8)); 
+		u_vx = -(this->self_odom.velocity[0] - this->nA_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(r_comm)) 
+			   -(this->self_odom.velocity[0] - this->nB_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(r_comm)); 
 		//compute y component of eq. (5) in EASN 
-		u_vy =  (this->self_odom.velocity[1] - this->nA_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(4.8))
-			   +(this->self_odom.velocity[1] - this->nB_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(4.8));
+		u_vy = -(-this->self_odom.velocity[0] + this->nA_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(r_comm))
+			   -(-this->self_odom.velocity[0] + this->nB_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nB)])/sigma_norm(r_comm));
 			
 	
 		// compute relative distance and relative x and y positions between UAV and TARGET
@@ -231,9 +237,9 @@ public:
 			
 		
 		
-		if(count > 20){k_abs = 1;} //start chasing the target after 20 iterations (1 second). This is because the initial estimates are very far from actual target states.
-		count = count +1;
-		
+		// if(count > 20){k_abs = 1;} //start chasing the target after 20 iterations (1 second). This is because the initial estimates are very far from actual target states.
+		// count = count +1;
+		k_abs=1;
 		
 		//compute control input along x axis
 		this->cmd_force_x = 
@@ -281,6 +287,58 @@ public:
 		// rate.sleep();
 	}
 
+	/*flocking timer callback*/
+	void flocking_cb(){
+		this->compute_flocking_cmd();
+		if(this->me == "1"){
+			// RCLCPP_INFO(get_logger(), "acc_x=%.3f m/s2 acc_y=%.3f m/s^2", cmd_force_x, cmd_force_y);
+			// RCLCPP_INFO(get_logger(), "/drone3: u_x[0]=%.3f m u_y[0]=%.3f m e_r[0]=%.3f", u_x[0], u_y[0], e_r[0]);
+			// RCLCPP_INFO(get_logger(), "/drone3: u_x[2]=%.3f m u_y[2]=%.3f m e_r[2]=%.3f", u_x[2], u_y[2], e_r[2]);
+			// RCLCPP_INFO(get_logger(), "/drone3: acc_x = %.3f + %.3f + %.3f + %.3f + %.3f + %.3f", u_x[std::stoi(nA)],
+			// 	 u_x[std::stoi(nB)],
+			// 	 k_d*u_vx ,
+			// 	 c_1*dist_lambda[3]*rho_int(dist[3]/d_int),
+			// 	 c_2*(x_est(2)-this->self_odom.velocity[0]),
+			// 	 c_int*e_vx_0t);
+			// acc_x[1] = -0.111 + 0.007 + 0.172 + 0.278 + 0.130 + 0.016
+
+			RCLCPP_INFO(get_logger(), "/drone3: acc_y = %.3f + %.3f + %.3f + %.3f + %.3f + %.3f",
+				u_y[std::stoi(nA)],
+				u_y[std::stoi(nB)],
+				k_d*u_vy ,
+				c_1*dist_phi[3]*rho_int(dist[3]/d_int) ,
+				c_2*(x_est(3)+this->self_odom.velocity[1]) , 
+				c_int*e_vy_0t);
+		}
+		// Publish acceleration command 
+		std_msgs::msg::Float64MultiArray acc_msg;
+		acc_msg.data.clear();
+		acc_msg.data.push_back(this->cmd_force_x);
+		acc_msg.data.push_back(this->cmd_force_y);
+		this->drone_command_pub->publish(acc_msg);
+	}
+
+	/* Execute the estimation and compute the flocking command each time a new sensor 
+	message is available */
+	void sensor_cb(const std_msgs::msg::Float64MultiArray msg){
+		if(this->last_sensor_info.data.empty()){
+			this->last_sensor_info = msg;
+		}
+		// Calculate DT in seconds
+		this->measured_DT = this->last_sensor_info.data[2] - msg.data[2];
+		this->last_sensor_info = msg;
+		// Do estimation
+		this->estimation();
+
+		if(this->me == "1"){
+			// RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f vx=%.3f vy=%.3f X=%.3f Y=%.3f", x_est[0], x_est[1],
+			// 	x_est[2], x_est[3], this->X, this->Y);
+			// RCLCPP_INFO(get_logger(), "H_meas: %.3f m %.3f rad  Z_meas: %.3f m %.3f rad",
+			// 	h_meas[0], h_meas[1], z_meas[0], z_meas[1]);
+
+		}
+	}	
+
 private:
 	/* -------------------------------------------------------------------------------*/
 	/*---------------------------- ROS 2 COMMUNICATION -------------------------------*/
@@ -300,6 +358,8 @@ private:
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_info_pub;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_estimate_pub;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr drone_command_pub;
+
+	rclcpp::TimerBase::SharedPtr flocking_timer;
 
 	px4_msgs::msg::VehicleOdometry nA_odom, nB_odom, self_odom;
 	std_msgs::msg::Float64MultiArray info_nA, info_nB, self_info;
@@ -344,40 +404,7 @@ private:
 	void nA_info_cb(const std_msgs::msg::Float64MultiArray msg){this->info_nA = msg;};
 	void nB_info_cb(const std_msgs::msg::Float64MultiArray msg){this->info_nB = msg;};
 
-	/* Execute the estimation and compute the flocking command each time a new sensor 
-		message is available */
-	void sensor_cb(const std_msgs::msg::Float64MultiArray msg){
-		if(this->last_sensor_info.data.empty()){
-			this->last_sensor_info = msg;
-		}
-		// Calculate DT in seconds
-		this->measured_DT = this->last_sensor_info.data[2] - msg.data[2];
-		this->last_sensor_info = msg;
 
-		// Do estimation
-		this->estimation();
-
-		if(this->me == "1"){
-			// RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f vx=%.3f vy=%.3f X=%.3f Y=%.3f", x_est[0], x_est[1],
-			// 	x_est[2], x_est[3], this->X, this->Y);
-			// RCLCPP_INFO(get_logger(), "H_meas: %.3f m %.3f rad  Z_meas: %.3f m %.3f rad",
-			// 	h_meas[0], h_meas[1], z_meas[0], z_meas[1]);
-
-		}
-		this->compute_flocking_cmd();
-		if(this->me == "0"){
-			// RCLCPP_INFO(get_logger(), "acc_x=%.3f m/s2 acc_y=%.3f m/s^2", cmd_force_x, cmd_force_y);
-			RCLCPP_INFO(get_logger(), "u_d[1]=(%.3f  %.3f) u_v=(%.3f  %.3f)", u_x[1], u_y[1], u_vx, u_vy);
-		}
-
-		// Publish acceleration command 
-		std_msgs::msg::Float64MultiArray acc_msg;
-		acc_msg.data.clear();
-		acc_msg.data.push_back(this->cmd_force_x);
-		acc_msg.data.push_back(this->cmd_force_y);
-		this->drone_command_pub->publish(acc_msg);
-
-	}	
 	/* -------------------------------------------------------------------------------*/
 	/*-------------------------- ESTIMATION VARIABLES --------------------------------*/
 
@@ -414,6 +441,9 @@ private:
 	double c_2 = 0.75;
 	double c_int = 0.05;
 	double d_int = 3; 
+
+	double target_distance = 1;			// [m] distance between drones
+	double r_comm = 4.8;				// [m] communication radius
 
 	std::vector<double> lambda;			// [rad] latitude
 	std::vector<double> phi;			// [rad] longitude

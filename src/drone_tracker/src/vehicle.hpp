@@ -19,6 +19,7 @@
 #include "px4_msgs/msg/offboard_control_mode.hpp"
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
+#include "std_msgs/msg/float32_multi_array.hpp"
 
 using namespace px4_msgs::msg;
 using namespace std::chrono_literals;
@@ -84,7 +85,8 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub = nullptr;
 	rclcpp::Subscription<px4_msgs::msg::VehicleControlMode>::SharedPtr vehicle_control_mode_sub = nullptr;
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr timesync_status_sub = nullptr;
-	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr vehicle_odometry_sub = nullptr;		  
+	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr vehicle_odometry_sub = nullptr;	
+	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr acceleration_sub = nullptr;	  
 
 	void vehicle_status_cb(const VehicleStatus & message) {
 		this->vehicle_status = std::make_shared<VehicleStatus>(std::move(message));};

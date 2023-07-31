@@ -124,7 +124,7 @@ private:
 
 			/* Polar coordinates */
 			std::vector<float> rho_theta = this->polar_coordinates(
-				"map", this->ros_namespace.substr(1) + "/camera");
+				this->ros_namespace.substr(1), "map");
 			// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
 			std_msgs::msg::Float64MultiArray rho_theta_msg;
 			rho_theta_msg.data.push_back(float(rho_theta[0]));

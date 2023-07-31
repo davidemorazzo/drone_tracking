@@ -42,8 +42,8 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 	this->vehicle_odometry_sub = this->create_subscription<VehicleOdometry>(
 		std::string(this->ros_namespace + "/fmu/out/vehicle_odometry"), sub_qos, 
 		std::bind(& Vehicle::vehicle_odometry_cb, this, _1));
-	this->create_subscription<std_msgs::msg::Float64MultiArray>(
-		std::string(this->ros_namespace + "/acceleration_cmd"), sub_qos, 
+	this->acceleration_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+		std::string(this->ros_namespace + "/acceleration_cmd"), 10, 
 		std::bind(& Vehicle::estimator_cb, this, _1));
 
 	this->current_state = MissionState::IDLE;
@@ -200,6 +200,7 @@ bool Vehicle::mission_func(){
 		// publish_pos_setpoint(0.3, 0.3, -2, 0);
 		/* Enable flocking algorithm command */
 		publish_hor_acc_setpoint(this->flocking_ax, this->flocking_ay, -2.0, 0);
+		// publish_hor_acc_setpoint(1.0, 1.0, -2.0, 0);
 	}
 	mission_cb_cnt++;
 	return false;
@@ -208,8 +209,11 @@ bool Vehicle::mission_func(){
 /* When a new acceleration command is available from the estimator, it is published to the autopilot */
 void Vehicle::estimator_cb(const std_msgs::msg::Float64MultiArray & message){
 	// ay is inverted to manage FLU=>FRD transform
-	this->flocking_ax = message.data[0];
-	this->flocking_ay = -message.data[1];
+	this->flocking_ax = float(message.data[0]);
+	this->flocking_ay = float(-message.data[1]);
+	// if (this->ros_namespace == "/drone2"){
+	// 	RCLCPP_INFO(get_logger(), "Acceleration cmd x=%.3f y=%.3f", this->flocking_ax, this->flocking_ay);
+	// }
 }
 
 void Vehicle::vehicle_odometry_cb(const VehicleOdometry & message) {
