@@ -344,10 +344,6 @@ public:
 		// Do estimation
 		this->estimation();
 
-		if(this->flocking_timer == nullptr){
-			this->flocking_timer = this->create_wall_timer(50ms, std::bind(& EASN_estimation::flocking_cb, this));
-		}
-
 
 		if(this->me == "1"){
 			// RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f vx=%.3f vy=%.3f X=%.3f Y=%.3f", x_est[0], x_est[1],
@@ -373,6 +369,7 @@ private:
 	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr nA_info_sub;
 	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr nB_info_sub;
 	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr sensor_sub;
+	rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr flocking_start_sub = nullptr;  
 
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_info_pub;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_estimate_pub;
@@ -384,6 +381,7 @@ private:
 	std_msgs::msg::Float64MultiArray info_nA, info_nB, self_info;
 	std_msgs::msg::Float64MultiArray my_est;
 	std_msgs::msg::Float64MultiArray last_sensor_info;
+	bool flocking_start = false;
 
 	void generate_subscribers(){
 		/* Odometry topics */
@@ -407,6 +405,10 @@ private:
 		this->nB_info_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
 			"/drone" + std::to_string(std::stoi(this->nB)+2) + "/information", 10,
 			std::bind(& EASN_estimation::nB_info_cb, this, _1)); 
+
+		this->flocking_start_sub = this->create_subscription<std_msgs::msg::Bool>(
+			std::string("/start_flocking"), 10, 
+			std::bind(& EASN_estimation::flocking_start_cb, this, _1));
 	}
 
 	void generate_publishers(){
@@ -424,6 +426,12 @@ private:
 	void nA_info_cb(const std_msgs::msg::Float64MultiArray msg){this->info_nA = msg;};
 	void nB_info_cb(const std_msgs::msg::Float64MultiArray msg){this->info_nB = msg;};
 
+	void flocking_start_cb(const std_msgs::msg::Bool & msg){
+		this->flocking_start = msg.data;
+		if(this->flocking_timer == nullptr){
+			this->flocking_timer = this->create_wall_timer(50ms, std::bind(& EASN_estimation::flocking_cb, this));
+		}
+	}
 
 	/* -------------------------------------------------------------------------------*/
 	/*-------------------------- ESTIMATION VARIABLES --------------------------------*/

@@ -45,6 +45,9 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 	this->acceleration_sub = this->create_subscription<std_msgs::msg::Float64MultiArray>(
 		std::string(this->ros_namespace + "/acceleration_cmd"), 10, 
 		std::bind(& Vehicle::estimator_cb, this, _1));
+	this->flocking_start_sub = this->create_subscription<std_msgs::msg::Bool>(
+		std::string("/start_flocking"), 10, 
+		std::bind(& Vehicle::flocking_start_cb, this, _1));
 
 	this->current_state = MissionState::IDLE;
 	this->next_state = MissionState::IDLE;
@@ -133,30 +136,52 @@ void Vehicle::mission_update(){
 					this->vehicle_starting_position[1] = this->vehicle_odometry->position[1];
 					this->vehicle_starting_position[2] = this->vehicle_odometry->position[2];
 					this->send_arm_command();
-					next_state = MissionState::MISSION;
-					RCLCPP_INFO(this->get_logger(), "PREFLIGHT_CHECK=>MISSION");
+					next_state = MissionState::TAKEOFF;
+					RCLCPP_INFO(this->get_logger(), "PREFLIGHT_CHECK=>TAKEOFF");
 					}
 				}
 			else 
 				{next_state = MissionState::PREFLIGHT_CHECK;}
 		break;
 		//-----------------------------------------------------
+		case TAKEOFF:
+			if(this->flocking_start)
+			{
+				RCLCPP_INFO(get_logger(), "TAKEOFF=>MISSION");
+				next_state = MissionState::MISSION;
+			}
+			else
+			{
+				publish_pos_setpoint(0.0, 0.0, -2, 0);
+				next_state = MissionState::TAKEOFF;
+			}
+			break;
+		//-----------------------------------------------------	
 		case MISSION:
-			if(this->mission_func())
+			if(! this->flocking_start)
 			{
 				RCLCPP_INFO(get_logger(), "MISSION=>LANDING");
 				next_state = MissionState::LANDING;
 			}
 			else
-				{next_state = MissionState::MISSION;}
+			{
+				publish_hor_acc_setpoint(this->flocking_ax, this->flocking_ay, -2.0, 0);
+				this->flocking_start = false;
+				next_state = MissionState::MISSION;
+			}
 			break;
 		//-----------------------------------------------------
 		case LANDING:
-			if(vehicle_status->nav_state != VehicleStatus::NAVIGATION_STATE_AUTO_LAND){
-				vehicle_command_pub->publish(
-					create_vehicle_command(VehicleCommand::VEHICLE_CMD_NAV_LAND)
-				);
-			}
+			publish_pos_setpoint(
+				this->vehicle_odometry->position[0], 
+				this->vehicle_odometry->position[1], 
+				0.5, 
+				0);
+			// if(vehicle_status->nav_state != VehicleStatus::NAVIGATION_STATE_AUTO_LAND){
+			// 	vehicle_command_pub->publish(
+			// 		create_vehicle_command(VehicleCommand::VEHICLE_CMD_NAV_LAND)
+			// 	);
+			// }
 			break;
 		//-----------------------------------------------------
 
@@ -191,19 +216,6 @@ void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
 	msg.timestamp = this->get_now_timestamp();
 	msg.yaw = yaw;
 	trajectory_setpoint_pub->publish(msg);
-}
-
-bool Vehicle::mission_func(){
-	if (mission_cb_cnt < 20){
-		publish_pos_setpoint(0.0, 0.0, -2, 0);
-	}else{
-		// publish_pos_setpoint(0.3, 0.3, -2, 0);
-		/* Enable flocking algorithm command */
-		publish_hor_acc_setpoint(this->flocking_ax, this->flocking_ay, -2.0, 0);
-		// publish_hor_acc_setpoint(1.0, 1.0, -2.0, 0);
-	}
-	mission_cb_cnt++;
-	return false;
 }
 
 /* When a new acceleration command is available from the estimator, it is published to the autopilot */

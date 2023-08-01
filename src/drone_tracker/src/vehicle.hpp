@@ -20,6 +20,7 @@
 #include "px4_msgs/msg/trajectory_setpoint.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "std_msgs/msg/float32_multi_array.hpp"
+#include "std_msgs/msg/bool.hpp"
 
 using namespace px4_msgs::msg;
 using namespace std::chrono_literals;
@@ -29,6 +30,7 @@ enum MissionState {
 	PREFLIGHT_CHECK,
 	MISSION,
 	LANDING,
+	TAKEOFF
 };
 
 class Vehicle : public rclcpp::Node {
@@ -69,6 +71,7 @@ private:
 	float acc_angle = 0;
 	float flocking_ax = 0.0;
 	float flocking_ay = 0.0;
+	bool flocking_start = false;
 
 	rclcpp::QoS sub_qos = rclcpp::QoS(0)
 		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
@@ -86,7 +89,8 @@ private:
 	rclcpp::Subscription<px4_msgs::msg::VehicleControlMode>::SharedPtr vehicle_control_mode_sub = nullptr;
 	rclcpp::Subscription<px4_msgs::msg::TimesyncStatus>::SharedPtr timesync_status_sub = nullptr;
 	rclcpp::Subscription<px4_msgs::msg::VehicleOdometry>::SharedPtr vehicle_odometry_sub = nullptr;	
-	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr acceleration_sub = nullptr;	  
+	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr acceleration_sub = nullptr;
+	rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr flocking_start_sub = nullptr;  
 
 	void vehicle_status_cb(const VehicleStatus & message) {
 		this->vehicle_status = std::make_shared<VehicleStatus>(std::move(message));};
@@ -94,6 +98,9 @@ private:
 		this->vehicle_control_mode = std::make_shared<VehicleControlMode>(std::move(message));};
 	void timesync_status_cb(const TimesyncStatus & message) {
 		this->timesync_status = std::make_shared<TimesyncStatus>(std::move(message));};
+	void flocking_start_cb(const std_msgs::msg::Bool & msg){
+		this->flocking_start = msg.data;
+	}
 	void vehicle_odometry_cb(const VehicleOdometry & message);
 	void estimator_cb(const std_msgs::msg::Float64MultiArray & message);
 
