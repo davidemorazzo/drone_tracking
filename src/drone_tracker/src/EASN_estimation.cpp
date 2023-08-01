@@ -208,7 +208,7 @@ public:
 				//compute distance regulator input + integral action on the relative distance --> eq(3) + eq. (8) of EASN
 				// u_alpha[i] = (rho_p(sigma_norm(dist[i])/sigma_norm(4.8))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(4)) 
 							// + k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
-				u_alpha[i] = (k_P * phi_p(sigma_norm(dist[i])-sigma_norm(target_distance)) 
+				u_alpha[i] = (k_P * phi_p((sigma_norm(dist[i])-sigma_norm(target_distance))/0.2) 
 							+ k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
 				
 				//compute x and y components of u_alpha      
@@ -273,12 +273,6 @@ public:
 		dist_plot.pose.orientation.y = dist[std::stoi(nB)];
 		dist_plot.pose.orientation.z = dist[3];
 		dist_plot.pose.orientation.w = x_est(3);*/
-			
-
-		// raw_pub.publish(cmd_raw);
-		// }
-		// else {local_pos_pub.publish(self_pose);}
-		
 		
 		// my_global.publish(self_state_global);
 		// my_vel.publish(self_vel);        
@@ -317,6 +311,25 @@ public:
 		acc_msg.data.push_back(this->cmd_force_x);
 		acc_msg.data.push_back(this->cmd_force_y);
 		this->drone_command_pub->publish(acc_msg);
+
+		/* Publish flocking statistics for plotting purposes */
+		std_msgs::msg::Float64MultiArray flocking_info;
+		flocking_info.data.clear();
+		flocking_info.data.push_back(dist[0]);					// Distance to drone 0
+		flocking_info.data.push_back(dist[1]);					// Distance to drone 1
+		flocking_info.data.push_back(dist[2]);					// Distance to drone 2
+		flocking_info.data.push_back(dist[3]);					// Distance to drone target
+
+		flocking_info.data.push_back(e_r[0]);					// Position integrator status
+		flocking_info.data.push_back(e_r[1]);					// Position integrator status
+		flocking_info.data.push_back(e_r[2]);					// Position integrator status
+		flocking_info.data.push_back(e_vx_0t);					// Target vel. integrator status
+		flocking_info.data.push_back(e_vy_0t);					// Target vel. integrator status
+
+		flocking_info.data.push_back(this->target_distance);	// Target inter-agent distance
+
+		this->flocking_stats->publish(flocking_info);
+		
 	}
 
 	/* Execute the estimation and compute the flocking command each time a new sensor 
@@ -364,7 +377,7 @@ private:
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_info_pub;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr self_estimate_pub;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr drone_command_pub;
-
+	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr flocking_stats;
 	rclcpp::TimerBase::SharedPtr flocking_timer;
 
 	px4_msgs::msg::VehicleOdometry nA_odom, nB_odom, self_odom;
@@ -401,6 +414,7 @@ private:
 		this->self_info_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + self_topic_id + "/information", 10);
 		this->self_estimate_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + self_topic_id + "/estimation", 10);
 		this->drone_command_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + self_topic_id + "/acceleration_cmd",10);
+		this->flocking_stats = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + self_topic_id + "/flocking_info",10);
 	}
 
 	void self_odom_cb(const px4_msgs::msg::VehicleOdometry msg){this->self_odom = msg;};
@@ -441,16 +455,16 @@ private:
 	// Control parameters, tuned for good performances
     double R_E = 6371008.7714;
 	/* Inter agent distance */
-	double k_I= 0.002;					// Integrative term of flock distance
-	double k_P = 0.35;					// Proportional term of flock distance
-	double k_d = 0.25;					// Proportional term angets velocity matching
+	double k_I= 0.02;					// Integrative term of flock distance
+	double k_P = 0.5;					// Proportional term of flock distance
+	double k_d = 0.18;					// Proportional term angets velocity matching
 	/* Target tracking */
-	double c_1 = 0.7;					// Proportional term target position tracking
-	double c_2 = 2.0;					// Proportional term target velocity matching
+	double c_1 = 0.5;					// Proportional term target position tracking
+	double c_2 = 10;					// Proportional term target velocity matching
 	double c_int = 0.001;				// Integral term on target velocity matching
 	double d_int = 1.5; 				// Attraction profile of target position
 
-	double target_distance = 1.5;			// [m] distance between drones
+	double target_distance = 1;			// [m] distance between drones
 	double r_comm = 3.5;				// [m] communication radius
 
 	std::vector<double> lambda;			// [rad] latitude

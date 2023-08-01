@@ -16,6 +16,16 @@ def generate_launch_description():
         ]],
         shell=True))
     
+    # ------ XRCE-Agent -------- #
+    nodes_list.append(
+        launch.actions.ExecuteProcess(
+        cmd=[[
+            'ros2 ', 'bag ', 'record ', 
+            '-a ',
+            '-x ', '.*camera.* '
+        ]],
+        shell=True))
+    
     for i in range(2,5):
         # ------- COMMANDER -------- #
         nodes_list.append(
