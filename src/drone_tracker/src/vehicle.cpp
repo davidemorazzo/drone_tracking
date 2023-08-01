@@ -194,7 +194,7 @@ void Vehicle::publish_pos_setpoint(float x, float y, float z, float yaw){
 }
 
 bool Vehicle::mission_func(){
-	if (mission_cb_cnt < 30){
+	if (mission_cb_cnt < 20){
 		publish_pos_setpoint(0.0, 0.0, -2, 0);
 	}else{
 		// publish_pos_setpoint(0.3, 0.3, -2, 0);

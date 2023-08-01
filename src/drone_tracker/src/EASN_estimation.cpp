@@ -43,8 +43,6 @@ public:
 		this->generate_subscribers();
 		this->generate_publishers();
 
-		this->flocking_timer = this->create_wall_timer(50ms, std::bind(& EASN_estimation::flocking_cb, this));
-
 		// Variable initialization
 		this->lambda = {0, 0, 0, 0};     
 		this->phi = {0, 0, 0, 0};     
@@ -55,6 +53,7 @@ public:
 		this->u_x = {0, 0, 0};     
 		this->u_y = {0, 0, 0};     
 		this->e_r = {0, 0, 0}; 
+		this->x_est = {0.0, 0.0, 0.0, 0.0};
 
 		this->e_vx_0t = 0;   
 		this->e_vy_0t= 0;      
@@ -209,7 +208,7 @@ public:
 				//compute distance regulator input + integral action on the relative distance --> eq(3) + eq. (8) of EASN
 				// u_alpha[i] = (rho_p(sigma_norm(dist[i])/sigma_norm(4.8))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(4)) 
 							// + k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
-				u_alpha[i] = -(rho_p(sigma_norm(dist[i])/sigma_norm(r_comm))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(target_distance)) 
+				u_alpha[i] = (k_P * phi_p(sigma_norm(dist[i])-sigma_norm(target_distance)) 
 							+ k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
 				
 				//compute x and y components of u_alpha      
@@ -231,7 +230,7 @@ public:
 		// compute relative distance and relative x and y positions between UAV and TARGET
 		// Y has to be inverted because self_odom ref frame is FRD and x_est is FLU
 		dist_lambda[3] = x_est(0) - (this->self_odom.position[0]); 
-		dist_phi[3] =    x_est(1) + (this->self_odom.position[1]); 
+		dist_phi[3] =    x_est(1) - (-this->self_odom.position[1]); 
 		dist[3] = sqrt(pow(x_est(0) - (this->self_odom.position[0]),2) + 
 						pow(x_est(1) + (this->self_odom.position[1]),2));
 			
@@ -246,20 +245,22 @@ public:
 				0.25 * (
 				  u_x[std::stoi(nA)]
 				+ u_x[std::stoi(nB)]
-				+ k_d*u_vx 
-				+ k_abs*(c_1*dist_lambda[3]*rho_int(dist[3]/d_int)
-				+ c_2*(x_est(2)-this->self_odom.velocity[0])
-				+ c_int*e_vx_0t)); 
+				// + k_d*u_vx 
+				+ c_1*dist_lambda[3]*rho_int(dist[3]/d_int)
+				// + c_2*(x_est(2)-this->self_odom.velocity[0])
+				// + c_int*e_vx_0t)
+				); 
 		
 		//compute control input along y axis
 		this->cmd_force_y = 
 				0.25 * (
 				  u_y[std::stoi(nA)]
 				+ u_y[std::stoi(nB)]
-				+ k_d*u_vy 
-				+ k_abs*(c_1*dist_phi[3]*rho_int(dist[3]/d_int) 
-				+ c_2*(x_est(3)+this->self_odom.velocity[1])  
-				+ c_int*e_vy_0t));
+				// + k_d*u_vy 
+				+ c_1*dist_phi[3]*rho_int(dist[3]/d_int) 
+				// + c_2*(x_est(3)+this->self_odom.velocity[1])  
+				// + c_int*e_vy_0t)
+				);
 		
 		
 		//discrete version of eq. (9) of EASN.  velocity error between UAV and target. 
@@ -301,14 +302,14 @@ public:
 			// 	 c_2*(x_est(2)-this->self_odom.velocity[0]),
 			// 	 c_int*e_vx_0t);
 			// acc_x[1] = -0.111 + 0.007 + 0.172 + 0.278 + 0.130 + 0.016
-
-			RCLCPP_INFO(get_logger(), "/drone3: acc_y = %.3f + %.3f + %.3f + %.3f + %.3f + %.3f",
-				u_y[std::stoi(nA)],
-				u_y[std::stoi(nB)],
-				k_d*u_vy ,
-				c_1*dist_phi[3]*rho_int(dist[3]/d_int) ,
-				c_2*(x_est(3)+this->self_odom.velocity[1]) , 
-				c_int*e_vy_0t);
+			RCLCPP_INFO(get_logger(), "u_alpha[0]=%.3f, e_r[0]=%.3f", u_alpha[0], e_r[0]);
+			// RCLCPP_INFO(get_logger(), "/drone3: acc_y = %.3f + %.3f + %.3f + %.3f + %.3f + %.3f",
+			// 	u_y[std::stoi(nA)],
+			// 	u_y[std::stoi(nB)],
+			// 	k_d*u_vy ,
+			// 	c_1*dist_phi[3]*rho_int(dist[3]/d_int) ,
+			// 	c_2*(x_est(3)+this->self_odom.velocity[1]) , 
+			// 	c_int*e_vy_0t);
 		}
 		// Publish acceleration command 
 		std_msgs::msg::Float64MultiArray acc_msg;
@@ -329,6 +330,11 @@ public:
 		this->last_sensor_info = msg;
 		// Do estimation
 		this->estimation();
+
+		if(this->flocking_timer == nullptr){
+			this->flocking_timer = this->create_wall_timer(50ms, std::bind(& EASN_estimation::flocking_cb, this));
+		}
+
 
 		if(this->me == "1"){
 			// RCLCPP_INFO(get_logger(), "x=%.3f y=%.3f vx=%.3f vy=%.3f X=%.3f Y=%.3f", x_est[0], x_est[1],
@@ -434,16 +440,16 @@ private:
 
 	// Control parameters, tuned for good performances
     double R_E = 6371008.7714;
-	double k_I= 0.001;
-	double k_P = 1;
+	double k_I= 0.0001;
+	double k_P = 0.35;
 	double k_d = 2;
-	double c_1 = 0.5;
+	double c_1 = 0.1;
 	double c_2 = 0.75;
-	double c_int = 0.05;
+	double c_int = 0.001;
 	double d_int = 3; 
 
-	double target_distance = 1;			// [m] distance between drones
-	double r_comm = 4.8;				// [m] communication radius
+	double target_distance = 2;			// [m] distance between drones
+	double r_comm = 3.5;				// [m] communication radius
 
 	std::vector<double> lambda;			// [rad] latitude
 	std::vector<double> phi;			// [rad] longitude
