@@ -245,10 +245,10 @@ public:
 				0.25 * (
 				  u_x[std::stoi(nA)]
 				+ u_x[std::stoi(nB)]
-				// + k_d*u_vx 
+				+ k_d*u_vx 
 				+ c_1*dist_lambda[3]*rho_int(dist[3]/d_int)
-				// + c_2*(x_est(2)-this->self_odom.velocity[0])
-				// + c_int*e_vx_0t)
+				+ c_2*(x_est(2)-this->self_odom.velocity[0])
+				+ c_int*e_vx_0t
 				); 
 		
 		//compute control input along y axis
@@ -256,10 +256,10 @@ public:
 				0.25 * (
 				  u_y[std::stoi(nA)]
 				+ u_y[std::stoi(nB)]
-				// + k_d*u_vy 
+				+ k_d*u_vy 
 				+ c_1*dist_phi[3]*rho_int(dist[3]/d_int) 
-				// + c_2*(x_est(3)+this->self_odom.velocity[1])  
-				// + c_int*e_vy_0t)
+				+ c_2*(x_est(3)+this->self_odom.velocity[1])  
+				+ c_int*e_vy_0t
 				);
 		
 		
@@ -302,14 +302,14 @@ public:
 			// 	 c_2*(x_est(2)-this->self_odom.velocity[0]),
 			// 	 c_int*e_vx_0t);
 			// acc_x[1] = -0.111 + 0.007 + 0.172 + 0.278 + 0.130 + 0.016
-			RCLCPP_INFO(get_logger(), "u_alpha[0]=%.3f, e_r[0]=%.3f", u_alpha[0], e_r[0]);
-			// RCLCPP_INFO(get_logger(), "/drone3: acc_y = %.3f + %.3f + %.3f + %.3f + %.3f + %.3f",
-			// 	u_y[std::stoi(nA)],
-			// 	u_y[std::stoi(nB)],
-			// 	k_d*u_vy ,
-			// 	c_1*dist_phi[3]*rho_int(dist[3]/d_int) ,
-			// 	c_2*(x_est(3)+this->self_odom.velocity[1]) , 
-			// 	c_int*e_vy_0t);
+			// RCLCPP_INFO(get_logger(), "u_alpha[0]=%.3f, e_r[0]=%.3f", u_alpha[0], e_r[0]);
+			RCLCPP_INFO(get_logger(), "/drone3: acc_y = %.3f + %.3f + %.3f + %.3f + %.3f + %.3f",
+				u_y[std::stoi(nA)],
+				u_y[std::stoi(nB)],
+				k_d*u_vy ,
+				c_1*dist_phi[3]*rho_int(dist[3]/d_int) ,
+				c_2*(x_est(3)+this->self_odom.velocity[1]) , 
+				c_int*e_vy_0t);
 		}
 		// Publish acceleration command 
 		std_msgs::msg::Float64MultiArray acc_msg;
@@ -440,15 +440,17 @@ private:
 
 	// Control parameters, tuned for good performances
     double R_E = 6371008.7714;
-	double k_I= 0.0001;
-	double k_P = 0.35;
-	double k_d = 2;
-	double c_1 = 0.1;
-	double c_2 = 0.75;
-	double c_int = 0.001;
-	double d_int = 3; 
+	/* Inter agent distance */
+	double k_I= 0.002;					// Integrative term of flock distance
+	double k_P = 0.35;					// Proportional term of flock distance
+	double k_d = 0.25;					// Proportional term angets velocity matching
+	/* Target tracking */
+	double c_1 = 0.7;					// Proportional term target position tracking
+	double c_2 = 2.0;					// Proportional term target velocity matching
+	double c_int = 0.001;				// Integral term on target velocity matching
+	double d_int = 1.5; 				// Attraction profile of target position
 
-	double target_distance = 2;			// [m] distance between drones
+	double target_distance = 1.5;			// [m] distance between drones
 	double r_comm = 3.5;				// [m] communication radius
 
 	std::vector<double> lambda;			// [rad] latitude
