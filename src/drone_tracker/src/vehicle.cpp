@@ -136,12 +136,14 @@ void Vehicle::mission_update(){
 					this->vehicle_starting_position[1] = this->vehicle_odometry->position[1];
 					this->vehicle_starting_position[2] = this->vehicle_odometry->position[2];
 					this->send_arm_command();
+					}
+				else{
 					next_state = MissionState::TAKEOFF;
 					RCLCPP_INFO(this->get_logger(), "PREFLIGHT_CHECK=>TAKEOFF");
-					}
 				}
-			else 
-				{next_state = MissionState::PREFLIGHT_CHECK;}
+			}else{
+				next_state = MissionState::PREFLIGHT_CHECK;
+			}
 		break;
 		//-----------------------------------------------------
 		case TAKEOFF:
@@ -165,7 +167,7 @@ void Vehicle::mission_update(){
 			}
 			else
 			{
-				publish_hor_acc_setpoint(this->flocking_ax, this->flocking_ay, -2.0, 0);
+				// See Vehicle::estimator_cb() for acceleration publication
 				this->flocking_start = false;
 				next_state = MissionState::MISSION;
 			}
@@ -223,9 +225,11 @@ void Vehicle::estimator_cb(const std_msgs::msg::Float64MultiArray & message){
 	// ay is inverted to manage FLU=>FRD transform
 	this->flocking_ax = float(message.data[0]);
 	this->flocking_ay = float(-message.data[1]);
-	// if (this->ros_namespace == "/drone2"){
-	// 	RCLCPP_INFO(get_logger(), "Acceleration cmd x=%.3f y=%.3f", this->flocking_ax, this->flocking_ay);
-	// }
+
+	/*Send the setpoint to the drone*/
+	if(this->current_state == MissionState::MISSION){
+		publish_hor_acc_setpoint(this->flocking_ax, this->flocking_ay, -2.0, 0);
+	}
 }
 
 void Vehicle::vehicle_odometry_cb(const VehicleOdometry & message) {
