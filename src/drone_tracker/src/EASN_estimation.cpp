@@ -208,7 +208,7 @@ public:
 				//compute distance regulator input + integral action on the relative distance --> eq(3) + eq. (8) of EASN
 				// u_alpha[i] = (rho_p(sigma_norm(dist[i])/sigma_norm(4.8))*k_P * phi_p(sigma_norm(dist[i])-sigma_norm(4)) 
 							// + k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
-				u_alpha[i] = (k_P * phi_p((sigma_norm(dist[i])-sigma_norm(target_distance))/0.4) 
+				u_alpha[i] = (k_P * phi_p((sigma_norm(dist[i])-sigma_norm(target_distance))/0.2) 
 							+ k_I * e_r[i])/sqrt(1 + 0.1*pow(dist[i],2));  
 				
 				//compute x and y components of u_alpha      
@@ -463,8 +463,8 @@ private:
 	// Control parameters, tuned for good performances
     double R_E = 6371008.7714;
 	/* Inter agent distance */
-	double k_I= 0.02;					// Integrative term of flock distance
-	double k_P = 0.5;					// Proportional term of flock distance
+	double k_I= 0.01;					// Integrative term of flock distance
+	double k_P = 0.6;					// Proportional term of flock distance
 	double k_d = 0.5;//0.18;					// Proportional term angets velocity matching
 	/* Target tracking */
 	double c_1 = 0.5;					// Proportional term target position tracking
@@ -473,7 +473,7 @@ private:
 	double d_int = 1.5; 				// Attraction profile of target position
 
 	double target_distance = 1;			// [m] distance between drones
-	double r_comm = 3.5;				// [m] communication radius
+	double r_comm = 1.2;				// [m] communication radius
 
 	std::vector<double> lambda;			// [rad] latitude
 	std::vector<double> phi;			// [rad] longitude
