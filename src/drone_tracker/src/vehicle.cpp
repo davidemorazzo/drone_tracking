@@ -73,11 +73,17 @@ void Vehicle::send_disarm_command(){
 	this->vehicle_command_pub->publish(command_msg);
 }
 
-VehicleCommand Vehicle::create_vehicle_command(int command, float param1, float param2){
+VehicleCommand Vehicle::create_vehicle_command(int command, float param1, float param2,
+	float param3, float param4, float param5, float param6, float param7){
 	/*Create vehicle command message*/
 	auto msg = VehicleCommand();
 	msg.param1 = param1;
 	msg.param2 = param2;
+	msg.param3 = param3;
+	msg.param4 = param4;
+	msg.param5 = param5;
+	msg.param6 = param6;
+	msg.param7 = param7;
 	msg.command = command;  					// command ID
 	msg.target_system = this->system_id();  	// system which should execute the command
 	msg.target_component = this->component_id();// component which should execute the command, 0 for all components
@@ -115,6 +121,7 @@ bool Vehicle::xrce_connected(){
 void Vehicle::mission_update(){
 
 	current_state = next_state;
+	VehicleCommand cmd;
 
 	switch(current_state){
 		case IDLE:
@@ -164,6 +171,8 @@ void Vehicle::mission_update(){
 			{
 				RCLCPP_INFO(get_logger(), "MISSION=>LANDING");
 				next_state = MissionState::LANDING;
+				this->land_pos_x = vehicle_odometry->position[0]; 
+				this->land_pos_y = vehicle_odometry->position[1]; 				
 			}
 			else
 			{
@@ -174,16 +183,22 @@ void Vehicle::mission_update(){
 			break;
 		//-----------------------------------------------------
 		case LANDING:
-			publish_pos_setpoint(
-				this->vehicle_odometry->position[0], 
-				this->vehicle_odometry->position[1], 
-				0.5, 
-				0);
-			// if(vehicle_status->nav_state != VehicleStatus::NAVIGATION_STATE_AUTO_LAND){
-			// 	vehicle_command_pub->publish(
-			// 		create_vehicle_command(VehicleCommand::VEHICLE_CMD_NAV_LAND)
-			// 	);
+			this->publish_pos_setpoint(
+					this->land_pos_x,
+					this->land_pos_y,
+					0.0, 0.0);
+			if (vehicle_odometry->position[2] < -0.2){
+				this->offboard_timer->cancel();
+			}
+			
+			// if(vehicle_status->nav_state != VehicleStatus::NAVIGATION_STATE_AUTO_LAND &&
+			// 	vehicle_status->nav_state != VehicleStatus::NAVIGATION_STATE_AUTO_PRECLAND){
+			// 	cmd = create_vehicle_command(VehicleCommand::VEHICLE_CMD_NAV_LAND);
+			// 	vehicle_command_pub->publish(cmd);
+			// 	// this->offboard_timer->cancel();
 			// }
+
+			next_state = MissionState::LANDING;
 			break;
 		//-----------------------------------------------------
 

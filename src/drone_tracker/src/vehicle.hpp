@@ -72,6 +72,7 @@ private:
 	float flocking_ax = 0.0;
 	float flocking_ay = 0.0;
 	bool flocking_start = false;
+	float land_pos_x = 0, land_pos_y = 0;
 
 	rclcpp::QoS sub_qos = rclcpp::QoS(0)
 		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
@@ -116,7 +117,8 @@ private:
 	rclcpp::TimerBase::SharedPtr mission_timer = this->create_wall_timer(500ms, std::bind(& Vehicle::mission_update, this));
 	rclcpp::TimerBase::SharedPtr offboard_timer = this->create_wall_timer(100ms, std::bind(& Vehicle::publish_offboard_control_signal, this));
 
-	px4_msgs::msg::VehicleCommand create_vehicle_command(int command, float param1=0.0, float param2=0.0);
+	px4_msgs::msg::VehicleCommand create_vehicle_command(int command, float param1=NAN, float param2=NAN,
+		float param3=NAN, float param4=NAN, float param5=NAN, float param6=NAN, float param7=NAN);
 	bool mission_func();
 	
 };
