@@ -216,7 +216,7 @@ public:
 				u_y[i] = u_alpha[i]*dist_phi[i];
 				//compute the discrete integral of error in relative distance (eq. (7) of EASN).  the "bump" function is needed to reset the error when communication is lost
 				// e_r[i] = (phi_p(sigma_norm(dist[i])-sigma_norm(target_distance)) + e_r[i])*bump(sigma_norm(dist[i])/sigma_norm(r_comm)); 
-				e_r[i] = (phi_p(sigma_norm(dist[i])-sigma_norm(target_distance)) + e_r[i])*bump(sigma_norm(dist[i])/sigma_norm(r_comm)); 
+				e_r[i] = (phi_p(sigma_norm(dist[i])-sigma_norm(target_distance))*2 + e_r[i])*bump(sigma_norm(dist[i])/sigma_norm(r_comm)); 
 			}}
 		
 		//compute x component of eq. (5) in EASN    
