@@ -55,7 +55,7 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 	this->tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 	this->tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
 
-	this->broadcast_camera_tf();
+	// this->broadcast_camera_tf();
 
 	RCLCPP_INFO(this->get_logger(), "Vehicle initialized");
 }

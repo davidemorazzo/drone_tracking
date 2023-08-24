@@ -339,7 +339,7 @@ public:
 			this->last_sensor_info = msg;
 		}
 		// Calculate DT in seconds
-		this->measured_DT = this->last_sensor_info.data[2] - msg.data[2];
+		this->measured_DT = msg.data[2] - this->last_sensor_info.data[2];
 		this->last_sensor_info = msg;
 		// Do estimation
 		this->estimation();

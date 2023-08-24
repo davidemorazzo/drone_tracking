@@ -11,6 +11,7 @@
 #include "tf2_ros/transform_broadcaster.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
+#include "tf2_ros/static_transform_broadcaster.h"
 
 #include "opencv2/opencv.hpp"
 #include "opencv2/core/quaternion.hpp"
@@ -58,22 +59,26 @@ public:
 		this->tf_broadcaster = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 		this->tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     	this->tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+		this->tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+
+		this->broadcast_camera_tf();
 	};
 
 private:
 	cv_bridge::CvImagePtr cv_ptr;
 	std::string ros_namespace;
 	sensor_msgs::msg::Image::SharedPtr last_image = nullptr;
-	float markerLength = 0.23; // [mm]
+	// float markerLength = 0.23; // [mm]
 	cv::Mat cameraMatrix, distCoeffs, cameraMatrixInv;
 	rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr rho_theta_pub;
-	float vehicle_pos[3] = {0.0, 0.0, 0.0};
-	float vehicle_q[4] = {0.0, 0.0, 0.0, 0.0};
+	// float vehicle_pos[3] = {0.0, 0.0, 0.0};
+	// float vehicle_q[4] = {0.0, 0.0, 0.0, 0.0};
 
 	std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   	std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
 
 
 	rclcpp::QoS sub_qos = rclcpp::QoS(0)
@@ -86,15 +91,15 @@ private:
 		.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE)
 		.history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
 
-	void odometry_cb(const px4_msgs::msg::VehicleOdometry &msg){
-		this->vehicle_pos[0] = msg.position[0];
-		this->vehicle_pos[1] = msg.position[1];
-		this->vehicle_pos[2] = msg.position[2];
-		this->vehicle_q[0] = msg.q[0];
-		this->vehicle_q[1] = msg.q[1];
-		this->vehicle_q[2] = msg.q[2];
-		this->vehicle_q[3] = msg.q[3];
-	}
+	// void odometry_cb(const px4_msgs::msg::VehicleOdometry &msg){
+	// 	this->vehicle_pos[0] = msg.position[0];
+	// 	this->vehicle_pos[1] = msg.position[1];
+	// 	this->vehicle_pos[2] = msg.position[2];
+	// 	this->vehicle_q[0] = msg.q[0];
+	// 	this->vehicle_q[1] = msg.q[1];
+	// 	this->vehicle_q[2] = msg.q[2];
+	// 	this->vehicle_q[3] = msg.q[3];
+	// }
 	
 	void image_cb(const sensor_msgs::msg::Image &msg){
 		cv_ptr = cv_bridge::toCvCopy(msg, std::string("bgra8"));
@@ -123,14 +128,20 @@ private:
 			);
 
 			/* Polar coordinates */
-			std::vector<float> rho_theta = this->polar_coordinates(
-				this->ros_namespace.substr(1), "map");
-			// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
-			std_msgs::msg::Float64MultiArray rho_theta_msg;
-			rho_theta_msg.data.push_back(float(rho_theta[0]));
-			rho_theta_msg.data.push_back(float(rho_theta[1]));
-			rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
-			this->rho_theta_pub->publish(rho_theta_msg);
+			// std::vector<float> rho_theta = this->polar_coordinates(
+			// 	this->ros_namespace.substr(1), "map");
+			try{
+				std::vector<float> rho_theta = this->polar_coordinates(
+					this->ros_namespace.substr(1), this->ros_namespace.substr(1)+"/marker");
+				// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
+				std_msgs::msg::Float64MultiArray rho_theta_msg;
+				rho_theta_msg.data.push_back(float(rho_theta[0]));
+				rho_theta_msg.data.push_back(float(rho_theta[1]));
+				rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
+				this->rho_theta_pub->publish(rho_theta_msg);
+			}catch(...){
+				RCLCPP_WARN(get_logger(), "Error generating polar coordinates");
+			}
 		}
 		
 	};
@@ -168,16 +179,6 @@ private:
 		return out;
 	}
 
-	cv::Mat drone_matrix(){
-		// cv::Mat drone_matrix = cv::Mat::eye(4,4,CV_32F);
-		cv::Quat<float> drone_quaternion = cv::Quat<float>(vehicle_q[0],vehicle_q[1],vehicle_q[2],vehicle_q[3]);
-		cv::Matx<float, 4, 4> drone_matrix = drone_quaternion.toRotMat4x4();
-		drone_matrix(0,3) =  this->vehicle_pos[0]; // add 15cm for camera position
-		drone_matrix(1,3) = -this->vehicle_pos[1];
-		drone_matrix(2,3) = -this->vehicle_pos[2];
-		return cv::Mat(drone_matrix);
-	}
-
 	std::vector<float> polar_coordinates(std::string parent_id, std::string child_id){
 		geometry_msgs::msg::TransformStamped t;
 			t = tf_buffer_->lookupTransform(
@@ -207,6 +208,23 @@ private:
 		t.transform.rotation.z = 0.0;
 		t.transform.rotation.w = 1.0;
 		this->tf_broadcaster->sendTransform(t);
+	}
+
+	void broadcast_camera_tf(){
+		geometry_msgs::msg::TransformStamped t;
+		tf2::Quaternion q;
+		q.setEuler(3.1415, 3.1415, 0.0);
+		t.header.stamp = this->get_clock()->now();
+		t.header.frame_id = this->ros_namespace;
+		t.child_frame_id = this->ros_namespace + "/camera";
+		t.transform.translation.x = 0.15;
+		t.transform.translation.y = 0.0;
+		t.transform.translation.z = 0.0;
+		t.transform.rotation.x = q.x();
+		t.transform.rotation.y = q.y();
+		t.transform.rotation.z = q.z();
+		t.transform.rotation.w = q.w();
+		this->tf_static_broadcaster_->sendTransform(t);
 	}
 	
 };

@@ -22,7 +22,8 @@ def generate_launch_description():
         cmd=[[
             'ros2 ', 'bag ', 'record ', 
             '-a ',
-            '-x ', '.*camera.* '
+            '-x ', '.*camera.* ',
+            '--use-sim-time '
         ]],
         shell=True))
     
