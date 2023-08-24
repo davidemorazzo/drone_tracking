@@ -30,16 +30,27 @@ install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
 )
-############## CAMERA NODE ######################
-add_executable(camera 
-  src/camera.cpp)
+############## GAZEBO CAMERA DRIVER NODE ######################
+add_executable(gazebo_camera_driver 
+  src/gazebo_camera_driver.cpp)
 
-target_link_libraries(camera ${OpenCV_LIBS})
-ament_target_dependencies(camera rclcpp std_msgs sensor_msgs cv_bridge px4_msgs geometry_msgs  tf2 tf2_ros)
-target_include_directories(camera PUBLIC
+target_link_libraries(gazebo_camera_driver ${OpenCV_LIBS})
+ament_target_dependencies(gazebo_camera_driver rclcpp std_msgs sensor_msgs cv_bridge px4_msgs geometry_msgs  tf2 tf2_ros)
+target_include_directories(gazebo_camera_driver PUBLIC
 $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include>)
-target_compile_features(camera PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(gazebo_camera_driver PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+############## ARUCO_POSE NODE ######################
+add_executable(aruco_pose 
+  src/aruco_pose_est.cpp)
+
+target_link_libraries(aruco_pose ${OpenCV_LIBS})
+ament_target_dependencies(aruco_pose rclcpp std_msgs sensor_msgs cv_bridge px4_msgs geometry_msgs  tf2 tf2_ros)
+target_include_directories(aruco_pose PUBLIC
+$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+$<INSTALL_INTERFACE:include>)
+target_compile_features(aruco_pose PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
 ############ OPENMV CAMERA NODE ###################
 add_executable(openmv_camera 
@@ -72,7 +83,7 @@ target_include_directories(estimator PUBLIC
   $<INSTALL_INTERFACE:include>)
 target_compile_features(estimator PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS estimator vehicle camera openmv_camera
+install(TARGETS estimator vehicle openmv_camera aruco_pose gazebo_camera_driver
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)

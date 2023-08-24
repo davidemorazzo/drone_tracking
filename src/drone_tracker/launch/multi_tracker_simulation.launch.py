@@ -44,12 +44,20 @@ def generate_launch_description():
             name=f'mocap_node{i}',
             namespace=f'/drone{i}')
         )
-        # ---- CAMERA NODE --- #
+        # ---- GAZEBO CAMERA DRIVER NODE --- #
         nodes_list.append(
             launch_ros.actions.Node(
             package='drone_tracker',
-            executable='camera',
-            name=f'camera{i}',
+            executable='gazebo_camera_driver',
+            name=f'gazebo_camera_driver{i}',
+            namespace=f'/drone{i}')
+        )
+        # ---- AURCO NODE --- #
+        nodes_list.append(
+            launch_ros.actions.Node(
+            package='drone_tracker',
+            executable='aruco_pose',
+            name=f'aruco_pose{i}',
             namespace=f'/drone{i}')
         )
     # ------ ESTIMATOR ------ #
