@@ -16,7 +16,7 @@ def generate_launch_description():
         ]],
         shell=True))
     
-    # ------ XRCE-Agent -------- #
+    # ------ ROSBAG2 -------- #
     nodes_list.append(
         launch.actions.ExecuteProcess(
         cmd=[[

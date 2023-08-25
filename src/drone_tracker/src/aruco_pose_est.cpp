@@ -12,8 +12,8 @@
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
 
-#include "opencv2/opencv.hpp"
-#include "opencv2/core/quaternion.hpp"
+#include <Eigen/Core>
+#include <Eigen/Dense>
 
 using namespace std::chrono_literals;
 using namespace std::chrono;
@@ -49,41 +49,31 @@ public:
 
 private:
 	std::string ros_namespace;
-	cv::Mat cameraMatrix, distCoeffs, cameraMatrixInv;
+	Eigen::Matrix3d cameraMatrix, cameraMatrixInv;
+	Eigen::Vector<double, 5> distCoeffs;
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr rho_theta_pub;
 	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr marker_pos_sub;
 	rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub;
 	
-
 	std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   	std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-
-
-	rclcpp::QoS sub_qos = rclcpp::QoS(0)
-		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
-		.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL)
-		.history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
-
-	rclcpp::QoS pub_qos = rclcpp::QoS(10)
-		.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
-		.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE)
-		.history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
-
 
 	void sensor_cb(const std_msgs::msg::Float64MultiArray & msg){
 		
 		/* Markers pose estimation */
 		if(! msg.data.empty()){
 
-			int marker_id;
-			marker_id = int(msg.data[0]);
-			cv::Mat camera_mtx = this->cameraTrasl(msg.data[1], msg.data[2]);
+			/*Filter only the needed marker ids*/
+			int marker_id = int(msg.data[0]);
+			if (marker_id != 23) {return;}
+
+			Eigen::Matrix4d camera_mtx = this->cameraTrasl(msg.data[1], msg.data[2]);
 
 			this->broadcast_marker_tf(
-				-camera_mtx.at<float>(0,3),						
-				-camera_mtx.at<float>(1,3),					
-				camera_mtx.at<float>(2,3)						
+				-camera_mtx(0,3),						
+				-camera_mtx(1,3),					
+				camera_mtx(2,3)						
 			);
 
 			/* Polar coordinates */
@@ -105,29 +95,23 @@ private:
 
 	void camera_info_cb(const sensor_msgs::msg::CameraInfo & msg){
 		/* Read camera parameter topic and store the camera matrix and distorsion coefficients*/
-		double c_matrix[3][3] = {
-			{msg.k[0], msg.k[1], msg.k[2]}, 
-			{msg.k[3], msg.k[4], msg.k[5]}, 
-			{msg.k[6], msg.k[7], msg.k[8]}
-		};
-		this->cameraMatrix = cv::Mat(3,3,CV_64F, c_matrix);
-		this->cameraMatrixInv = cameraMatrix.inv();
+		this->cameraMatrix << 	msg.k[0], msg.k[1], msg.k[2], 
+								msg.k[3], msg.k[4], msg.k[5], 
+								msg.k[6], msg.k[7], msg.k[8];
+		this->cameraMatrixInv = cameraMatrix.inverse();
+		this->distCoeffs = Eigen::Vector<double, 5>(msg.d.data());
 
-		double dist_vect[5] = {{msg.d[0]}, {msg.d[1]}, {msg.d[2]}, {msg.d[3]}, {msg.d[4]}};
-		this->distCoeffs = cv::Mat(5,1, CV_64F, dist_vect);
-
-		RCLCPP_INFO(get_logger(), "Camera matrix %f %f %f %f %f %f %f %f %f", cameraMatrix.at<double>(0,0),
-			cameraMatrix.at<double>(0,1), cameraMatrix.at<double>(0,2), cameraMatrix.at<double>(1,0), cameraMatrix.at<double>(1,1), 
-			cameraMatrix.at<double>(1,2), cameraMatrix.at<double>(2,0),cameraMatrix.at<double>(2,1), cameraMatrix.at<double>(2,2));
-		RCLCPP_INFO(get_logger(), "Distorsion  matrix %f %f %f %f %f", distCoeffs.at<double>(0,0),
-			distCoeffs.at<double>(1,0), distCoeffs.at<double>(2,0), distCoeffs.at<double>(3,0), distCoeffs.at<double>(4,0));
+		RCLCPP_INFO(get_logger(), "Camera matrix %f %f %f %f %f %f %f %f %f", cameraMatrix(0,0),
+			cameraMatrix(0,1), cameraMatrix(0,2), cameraMatrix(1,0), cameraMatrix(1,1), 
+			cameraMatrix(1,2), cameraMatrix(2,0),cameraMatrix(2,1), cameraMatrix(2,2));
+		RCLCPP_INFO(get_logger(), "Distorsion  matrix %f %f %f %f %f", distCoeffs(0,0),
+			distCoeffs(1,0), distCoeffs(2,0), distCoeffs(3,0), distCoeffs(4,0));
 
 		/* Unsubscribe ?? */
 		this->camera_info_sub = nullptr;
 	}
 
-	cv::Mat cameraTrasl(double marker_cx, double marker_cy){
-		cv::Mat out;
+	Eigen::Matrix4d cameraTrasl(double marker_cx, double marker_cy){
 		/*Camera position*/
 		geometry_msgs::msg::TransformStamped camera_tf;
 		std::string camera_frame_id = this->ros_namespace.substr(1) + "/camera";
@@ -135,22 +119,21 @@ private:
 			"map", camera_frame_id,
 			tf2::TimePointZero);
 
-		cv::Mat image_plane = cv::Mat(3, 1, CV_32F);
+		Eigen::Matrix<double, 3, 1> image_plane;
 
 		float camera_height = camera_tf.transform.translation.z;
-		image_plane.at<float>(0,0) = marker_cx * camera_height;
-		image_plane.at<float>(1,0) = marker_cy * camera_height;
-		image_plane.at<float>(2,0) = camera_height;
+		image_plane(0, 0) = marker_cx * camera_height;
+		image_plane(1, 0) = marker_cy * camera_height;
+		image_plane(2, 0) = camera_height;
 		
-		cv::Mat coord = cv::Mat(CV_32F,3,1); 
-		coord = this->cameraMatrixInv * image_plane;
+		Eigen::Matrix<double, 3, 1> coord = this->cameraMatrixInv * image_plane;
 
-		cv::Matx<float, 4, 4> camera_matrix = cv::Matx<float, 4, 4>::eye();
-		camera_matrix(0,3) = -coord.at<float>(1,0);
-		camera_matrix(1,3) = -coord.at<float>(0,0);
-		camera_matrix(2,3) = -coord.at<float>(2,0);
+		Eigen::Matrix4d camera_matrix = Eigen::Matrix4d::Identity();
+		camera_matrix(0,3) = -coord(1,0);
+		camera_matrix(1,3) = -coord(0,0);
+		camera_matrix(2,3) = -coord(2,0);
 
-		return cv::Mat(camera_matrix);
+		return camera_matrix;
 	}
 
 	std::vector<float> polar_coordinates(std::string parent_id, std::string child_id){
