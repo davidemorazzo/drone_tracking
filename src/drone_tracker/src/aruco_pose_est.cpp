@@ -138,9 +138,7 @@ private:
 
 	std::vector<float> polar_coordinates(std::string parent_id, std::string child_id){
 		geometry_msgs::msg::TransformStamped t;
-			t = tf_buffer_->lookupTransform(
-            	parent_id, child_id,
-            	tf2::TimePointZero);
+		t = tf_buffer_->lookupTransform(child_id, parent_id, tf2::TimePointZero);
 		
 		float rho = sqrt(pow(t.transform.translation.x,2) + pow(t.transform.translation.y,2));
 		float theta = atan2(t.transform.translation.y, t.transform.translation.x);

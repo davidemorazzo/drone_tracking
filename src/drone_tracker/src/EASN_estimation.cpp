@@ -120,10 +120,14 @@ public:
 			//get the actual measurement from the sensor
 			z_meas << this->last_sensor_info.data[0], this->last_sensor_info.data[1];
 					
-			// eq. (17) of EASN    	
-			I_meas = grad_h.transpose()*R.inverse()*grad_h;    	      
-			i_meas = grad_h.transpose()*R.inverse()*(z_meas - h_meas + grad_h*x_pred); 
-			
+			// Take care of angle periodicity when doing the difference
+			Eigen::Vector2d diff = z_meas - h_meas; 	
+			if (diff(1) > (M_PI)) diff(1) -= (2*M_PI);
+			if (diff(1) <-(M_PI)) diff(1) += (2*M_PI);
+
+			// eq. (17) of EASN
+			I_meas = grad_h.transpose()*R.inverse()*grad_h;
+			i_meas = grad_h.transpose()*R.inverse()*(diff + grad_h*x_pred);
 			
 			
 			//////////////////////////////UPDATE///////////////////////////////    
@@ -165,6 +169,8 @@ public:
 			my_est.data.push_back(self_odom.position[2]); // Position Z [m]
 			my_est.data.push_back(self_odom.velocity[0]); // Velocity X [m/s]
 			my_est.data.push_back(self_odom.velocity[1]); // Velocity Y [m/s]
+			my_est.data.push_back(h_meas(0));
+			my_est.data.push_back(h_meas(1));
 			
 			
 			this->self_info_pub->publish(self_info);
@@ -174,7 +180,6 @@ public:
 			the last measurement was performed. This is crucial to obtain precise velocity estimate. */
 			// prev_time = rho_theta.data[6];
 			// prev_time = this->last_sensor_info.data[3];
-			
 	};
 	
 	/*Flocking Algorithm*/
