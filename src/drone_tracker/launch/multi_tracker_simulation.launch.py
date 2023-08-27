@@ -22,7 +22,7 @@ def generate_launch_description():
         cmd=[[
             'ros2 ', 'bag ', 'record ', 
             '-a ',
-            '-x ', '.*camera.* ',
+            '-x ', '\/(clock|drone[0-9]\/camera\/(?!marker_pos).*) ',
             '--use-sim-time '
         ]],
         shell=True))
@@ -39,8 +39,8 @@ def generate_launch_description():
         # ---- MOTION CAPTURE --- #
         nodes_list.append(
             launch_ros.actions.Node(
-            package='drone_tracker_py',
-            executable='mocap_gazebo',
+            package='gazebo_mocap',
+            executable='mocap',
             name=f'mocap_node{i}',
             namespace=f'/drone{i}')
         )

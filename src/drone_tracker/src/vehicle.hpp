@@ -30,7 +30,8 @@ enum MissionState {
 	PREFLIGHT_CHECK,
 	MISSION,
 	LANDING,
-	TAKEOFF
+	TAKEOFF,
+	POWEROFF
 };
 
 class Vehicle : public rclcpp::Node {

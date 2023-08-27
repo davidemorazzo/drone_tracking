@@ -125,7 +125,7 @@ void Vehicle::mission_update(){
 
 	switch(current_state){
 		case IDLE:
-			if (xrce_connected()){
+			{if (xrce_connected()){
 				if(this->nav_state() == VehicleStatus::NAVIGATION_STATE_OFFBOARD){
 					RCLCPP_INFO(this->get_logger(), "IDLE=>PREFLIGHT_CHECK");
 					next_state = MissionState::PREFLIGHT_CHECK;
@@ -133,11 +133,11 @@ void Vehicle::mission_update(){
 					this->offboard_flight_mode(); /*Set offboard flight mode*/
 					next_state = MissionState::IDLE;
 				}
-			}
+			}}
 			break;
 		//-----------------------------------------------------
 		case PREFLIGHT_CHECK:
-			if(this->preflight_check())	{
+			{if(this->preflight_check())	{
 				if(!this->is_armed()){
 					this->vehicle_starting_position[0] = this->vehicle_odometry->position[0];
 					this->vehicle_starting_position[1] = this->vehicle_odometry->position[1];
@@ -150,11 +150,11 @@ void Vehicle::mission_update(){
 				}
 			}else{
 				next_state = MissionState::PREFLIGHT_CHECK;
-			}
+			}}
 		break;
 		//-----------------------------------------------------
 		case TAKEOFF:
-			if(this->flocking_start)
+			{if(this->flocking_start)
 			{
 				RCLCPP_INFO(get_logger(), "TAKEOFF=>MISSION");
 				next_state = MissionState::MISSION;
@@ -163,11 +163,11 @@ void Vehicle::mission_update(){
 			{
 				publish_pos_setpoint(0.0, 0.0, -2, 0);
 				next_state = MissionState::TAKEOFF;
-			}
+			}}
 			break;
 		//-----------------------------------------------------	
 		case MISSION:
-			if(! this->flocking_start)
+			{if(! this->flocking_start)
 			{
 				RCLCPP_INFO(get_logger(), "MISSION=>LANDING");
 				next_state = MissionState::LANDING;
@@ -179,31 +179,32 @@ void Vehicle::mission_update(){
 				// See Vehicle::estimator_cb() for acceleration publication
 				this->flocking_start = false;
 				next_state = MissionState::MISSION;
-			}
+			}}
 			break;
 		//-----------------------------------------------------
 		case LANDING:
-			RCLCPP_INFO(get_logger(), "Current position (%.2f %.2f) :: Land setpoint (%.2f %.2f)",
-				vehicle_odometry->position[0], vehicle_odometry->position[1], land_pos_x, land_pos_y);
-			this->publish_pos_setpoint(
+			{this->publish_pos_setpoint(
 					this->land_pos_x,
 					this->land_pos_y,
-					-0.1, 0.0);
-			if (vehicle_odometry->position[2] > -0.3){
+					-0.0, 0.0);
+			if (vehicle_odometry->position[2] > -0.2){
 				this->offboard_timer->cancel();
+				next_state = MissionState::POWEROFF;
+				RCLCPP_INFO(get_logger(), "Landing detected! Performing poweroff ...");
+				return;
 			}
-			
-			// if(vehicle_status->nav_state != VehicleStatus::NAVIGATION_STATE_AUTO_LAND &&
-			// 	vehicle_status->nav_state != VehicleStatus::NAVIGATION_STATE_AUTO_PRECLAND){
-			// 	cmd = create_vehicle_command(VehicleCommand::VEHICLE_CMD_NAV_LAND);
-			// 	vehicle_command_pub->publish(cmd);
-			// 	// this->offboard_timer->cancel();
-			// }
-
-			next_state = MissionState::LANDING;
+			next_state = MissionState::LANDING;}
 			break;
 		//-----------------------------------------------------
-
+		case POWEROFF:
+		{
+			if (!this->is_armed()){
+				/* Send flight termination command after landing*/
+				cmd = this->create_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_FLIGHTTERMINATION, 1.0);
+				this->vehicle_command_pub->publish(cmd);
+			}
+		}
+		break;
 		
 		default:
 			next_state = MissionState::IDLE;
