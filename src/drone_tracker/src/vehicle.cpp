@@ -171,8 +171,8 @@ void Vehicle::mission_update(){
 			{
 				RCLCPP_INFO(get_logger(), "MISSION=>LANDING");
 				next_state = MissionState::LANDING;
-				this->land_pos_x = vehicle_odometry->position[0]; 
-				this->land_pos_y = vehicle_odometry->position[1]; 				
+				this->land_pos_x = vehicle_odometry->position[0] - vehicle_starting_position[0]; 
+				this->land_pos_y = vehicle_odometry->position[1] - vehicle_starting_position[1]; 				
 			}
 			else
 			{
@@ -183,11 +183,13 @@ void Vehicle::mission_update(){
 			break;
 		//-----------------------------------------------------
 		case LANDING:
+			RCLCPP_INFO(get_logger(), "Current position (%.2f %.2f) :: Land setpoint (%.2f %.2f)",
+				vehicle_odometry->position[0], vehicle_odometry->position[1], land_pos_x, land_pos_y);
 			this->publish_pos_setpoint(
 					this->land_pos_x,
 					this->land_pos_y,
-					0.0, 0.0);
-			if (vehicle_odometry->position[2] < -0.2){
+					-0.1, 0.0);
+			if (vehicle_odometry->position[2] > -0.3){
 				this->offboard_timer->cancel();
 			}
 			

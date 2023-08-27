@@ -119,7 +119,6 @@ private:
 
 	px4_msgs::msg::VehicleCommand create_vehicle_command(int command, float param1=NAN, float param2=NAN,
 		float param3=NAN, float param4=NAN, float param5=NAN, float param6=NAN, float param7=NAN);
-	bool mission_func();
 	
 };
 

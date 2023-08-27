@@ -302,13 +302,13 @@ public:
 			// 	 c_int*e_vx_0t);
 			// acc_x[1] = -0.111 + 0.007 + 0.172 + 0.278 + 0.130 + 0.016
 			// RCLCPP_INFO(get_logger(), "u_alpha[0]=%.3f, e_r[0]=%.3f", u_alpha[0], e_r[0]);
-			RCLCPP_INFO(get_logger(), "/drone3: acc_y = %.3f + %.3f + %.3f + %.3f + %.3f + %.3f",
-				u_y[std::stoi(nA)],
-				u_y[std::stoi(nB)],
-				k_d*u_vy ,
-				c_1*dist_phi[3]*rho_int(dist[3]/d_int) ,
-				c_2*(x_est(3)+this->self_odom.velocity[1]) , 
-				c_int*e_vy_0t);
+			// RCLCPP_INFO(get_logger(), "/drone3: acc_y = %.3f + %.3f + %.3f + %.3f + %.3f + %.3f",
+			// 	u_y[std::stoi(nA)],
+			// 	u_y[std::stoi(nB)],
+			// 	k_d*u_vy ,
+			// 	c_1*dist_phi[3]*rho_int(dist[3]/d_int) ,
+			// 	c_2*(x_est(3)+this->self_odom.velocity[1]) , 
+			// 	c_int*e_vy_0t);
 		}
 		// Publish acceleration command 
 		std_msgs::msg::Float64MultiArray acc_msg;

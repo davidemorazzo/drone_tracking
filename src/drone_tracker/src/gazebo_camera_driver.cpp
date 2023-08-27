@@ -56,6 +56,11 @@ private:
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   	std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 	std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
+	std::vector<int> markerIds;
+	std::vector<std::vector<cv::Point2f>> markerCorners, rejectedCandidates;
+	cv::aruco::DetectorParameters detectorParams = cv::aruco::DetectorParameters();
+	cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
+	cv::aruco::ArucoDetector detector = cv::aruco::ArucoDetector(dictionary, detectorParams);
 
 	
 	void image_cb(const sensor_msgs::msg::Image &msg){
@@ -67,11 +72,9 @@ private:
 		cv::cvtColor(cv_ptr->image, inputImage, cv::COLOR_BGR2GRAY);
 
 		/* Locate markers with OpenCV */
-		std::vector<int> markerIds;
-		std::vector<std::vector<cv::Point2f>> markerCorners, rejectedCandidates;
-		cv::aruco::DetectorParameters detectorParams = cv::aruco::DetectorParameters();
-		cv::aruco::Dictionary dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
-		cv::aruco::ArucoDetector detector(dictionary, detectorParams);
+		markerIds.clear();
+		markerCorners.clear();
+		rejectedCandidates.clear();
 		detector.detectMarkers(inputImage, markerCorners, markerIds, rejectedCandidates);
 		
 		/* Send marker positions */
