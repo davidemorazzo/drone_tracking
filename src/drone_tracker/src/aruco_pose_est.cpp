@@ -84,7 +84,7 @@ private:
 				std_msgs::msg::Float64MultiArray rho_theta_msg;
 				rho_theta_msg.data.push_back(float(rho_theta[0]));
 				rho_theta_msg.data.push_back(float(rho_theta[1]));
-				rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
+				rho_theta_msg.data.push_back(float(this->now().nanoseconds())/1E9f);
 				this->rho_theta_pub->publish(rho_theta_msg);
 			}catch(...){
 				RCLCPP_WARN(get_logger(), "Error generating polar coordinates");
