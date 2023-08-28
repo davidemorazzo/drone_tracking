@@ -10,13 +10,9 @@ from nav_msgs.msg import (
     Path,
     Odometry)
 from geometry_msgs.msg import (
-    PoseArray, 
     Pose,
     PoseStamped)
-from px4_msgs.msg import (
-    VehicleOdometry,
-    VehicleLocalPosition,
-    VehicleAttitude)
+from px4_msgs.msg import VehicleOdometry
 
 from math import sqrt
 import numpy as np
@@ -37,8 +33,6 @@ class MocapNode (Node):
         # Subscribers
         self.subscriber_ =      self.create_subscription(Odometry, self.ros_ns+"/odom", self.listener_cb, 10)
         # Publishers
-        self.pose_pub =         self.create_publisher(PoseStamped,      self.ros_ns+"/pose", 10)
-        self.path_pub =         self.create_publisher(Path,             self.ros_ns+"/path", 10)
         self.mocap_odom_pub =   self.create_publisher(VehicleOdometry,  self.ros_ns+"/fmu/in/vehicle_visual_odometry", 10)
         # Messages
         self.vehicle_path_msg = Path()
@@ -54,12 +48,6 @@ class MocapNode (Node):
 
         # Change ref fram to FLU and publish msg
         self.vehicle_pose_msg = self.gazebo_to_flu_tf(self.gz_pose_msg)
-        self.pose_pub.publish(self.vehicle_pose_msg)
-        # Publish path msg
-        if self.path_cnt == 0:
-            self.vehicle_path_msg.poses.append(self.vehicle_pose_msg)
-            self.path_pub.publish(self.vehicle_path_msg)
-        self.path_cnt = (self.path_cnt + 1) % 10
         # Create mocap odometry msg and publish to PX4
         self.mocap_odom_msg = self.create_odometry_msg(self.vehicle_pose_msg.pose)
         self.mocap_odom_pub.publish(self.mocap_odom_msg)
@@ -126,22 +114,6 @@ class MocapNode (Node):
         odom_msg.quality = 1
         return odom_msg
     
-    def local_pos_cb(self, msg : VehicleLocalPosition):
-        """
-        Remap the VehicleLocalPosition to PoseStamped to visualize in Rviz2
-        """
-        if self.attitude_msg != None:
-            new_pose = PoseStamped()
-            new_pose.header.frame_id = 'map'
-            new_pose.pose.position.x = msg.x
-            new_pose.pose.position.y = msg.y
-            new_pose.pose.position.z = msg.z
-            new_pose.pose.orientation.x = float(self.attitude_msg.q[0])            
-            new_pose.pose.orientation.y = float(self.attitude_msg.q[1])
-            new_pose.pose.orientation.z = float(self.attitude_msg.q[2])
-            new_pose.pose.orientation.w = float(self.attitude_msg.q[3])
-            self.ned_px4_pose_pub.publish(new_pose)        
-
 
     def quaternion_multiply(self, quaternion1, quaternion0) -> np.ndarray:
         """

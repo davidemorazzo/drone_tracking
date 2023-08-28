@@ -22,7 +22,7 @@ def generate_launch_description():
         cmd=[[
             'ros2 ', 'bag ', 'record ', 
             '-a ',
-            '-x ', '\/(clock|drone[0-9]\/camera\/(?!marker_pos).*) ',
+            '-x ', "'\/(drone[0-9]\/camera\/(?!marker_pos).*)' ",
             '--use-sim-time '
         ]],
         shell=True))
@@ -34,7 +34,8 @@ def generate_launch_description():
             package='drone_tracker',
             executable='vehicle',
             namespace=f'/drone{i}',
-            name=f'vehicle{i}')
+            name=f'vehicle{i}',
+            parameters=[{'use_sim_time':True}])
         )
         # ---- MOTION CAPTURE --- #
         nodes_list.append(
@@ -42,7 +43,8 @@ def generate_launch_description():
             package='gazebo_mocap',
             executable='mocap',
             name=f'mocap_node{i}',
-            namespace=f'/drone{i}')
+            namespace=f'/drone{i}',
+            parameters=[{'use_sim_time':True}])
         )
         # ---- GAZEBO CAMERA DRIVER NODE --- #
         nodes_list.append(
@@ -50,7 +52,8 @@ def generate_launch_description():
             package='drone_tracker',
             executable='gazebo_camera_driver',
             name=f'gazebo_camera_driver{i}',
-            namespace=f'/drone{i}')
+            namespace=f'/drone{i}',
+            parameters=[{'use_sim_time':True}])
         )
         # ---- AURCO NODE --- #
         nodes_list.append(
@@ -58,7 +61,8 @@ def generate_launch_description():
             package='drone_tracker',
             executable='aruco_pose',
             name=f'aruco_pose{i}',
-            namespace=f'/drone{i}')
+            namespace=f'/drone{i}',
+            parameters=[{'use_sim_time':True}])
         )
     # ------ ESTIMATOR ------ #
     nodes_list.append(
@@ -70,7 +74,8 @@ def generate_launch_description():
         parameters=[
             {"self_id":"0"},
             {"nA_id":"1"},
-            {"nB_id":"2"}
+            {"nB_id":"2"},
+            {'use_sim_time':True}
         ]))
 
     nodes_list.append(
@@ -82,7 +87,8 @@ def generate_launch_description():
         parameters=[
             {"self_id":"1"},
             {"nA_id":"0"},
-            {"nB_id":"2"}
+            {"nB_id":"2"},
+            {'use_sim_time':True}
         ]))
     
     nodes_list.append(
@@ -94,7 +100,8 @@ def generate_launch_description():
         parameters=[
             {"self_id":"2"},
             {"nA_id":"1"},
-            {"nB_id":"0"}
+            {"nB_id":"0"},
+            {'use_sim_time':True}
         ]))
 
     return launch.LaunchDescription(nodes_list)
