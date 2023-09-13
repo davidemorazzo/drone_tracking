@@ -157,11 +157,11 @@ void Vehicle::mission_update(){
 			{if(this->flocking_start)
 			{
 				RCLCPP_INFO(get_logger(), "TAKEOFF=>MISSION");
-				next_state = MissionState::MISSION;
+				next_state = MissionState::LANDING;
 			}
 			else
 			{
-				publish_pos_setpoint(0.0, 0.0, -2, 0);
+				publish_pos_setpoint(0.0, 0.0, -1, 0);
 				next_state = MissionState::TAKEOFF;
 			}}
 			break;
@@ -188,7 +188,7 @@ void Vehicle::mission_update(){
 					this->land_pos_y,
 					-0.0, 0.0);
 			if (vehicle_odometry->position[2] > -0.2){
-				this->offboard_timer->cancel();
+				// this->offboard_timer->cancel();
 				next_state = MissionState::POWEROFF;
 				RCLCPP_INFO(get_logger(), "Landing detected! Performing poweroff ...");
 				return;
@@ -197,8 +197,9 @@ void Vehicle::mission_update(){
 			break;
 		//-----------------------------------------------------
 		case POWEROFF:
-		{
-			if (!this->is_armed()){
+		{	
+			// this->send_disarm_command();
+			if (this->is_armed()){
 				/* Send flight termination command after landing*/
 				cmd = this->create_vehicle_command(VehicleCommand::VEHICLE_CMD_DO_FLIGHTTERMINATION, 1.0);
 				this->vehicle_command_pub->publish(cmd);
