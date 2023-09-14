@@ -36,7 +36,7 @@ public:
 			std::bind(& Camera::image_cb, this, _1));
 
 		rho_theta_pub = create_publisher<std_msgs::msg::Float64MultiArray>(
-			std::string(ros_namespace + "/sensor_measure"), 10);
+			std::string(ros_namespace + "/camera/marker_pos"), 10);
 
 
 		float c_matrix[3][3] = {
@@ -74,6 +74,7 @@ private:
 	void image_cb(const std_msgs::msg::Float64MultiArray &msg){
 		/* Markers pose estimation */
 		if(! msg.data.empty()){
+			if (msg.data[0] != 2) return;
 			try{
 				cv::Mat camera_mtx = this->cameraTrasl(msg.data);
 				this->broadcast_marker_tf(
@@ -92,7 +93,9 @@ private:
 				rho_theta_msg.data.push_back(duration_cast<microseconds>(system_clock::now().time_since_epoch()).count() / 1E6);
 				this->rho_theta_pub->publish(rho_theta_msg);
 			
-			}catch (...){}
+			}catch (...){
+				RCLCPP_WARN(get_logger(), "Callback 'image_cb' exception");
+			}
 		}
 		
 	};
@@ -102,7 +105,7 @@ private:
 		if (int(info.size() >= 3)){
 			cv::Mat image_plane = cv::Mat(3, 1, CV_32F);
 			cv::Point2f center_point(info[1], info[2]);
-			RCLCPP_INFO(get_logger(), "Point x=%.1f px y=%.1f px", center_point.x, center_point.y);
+			// RCLCPP_INFO(get_logger(), "Point x=%.1f px y=%.1f px", center_point.x, center_point.y);
 
 			/* Undistort point */
 			// std::vector<cv::Point2d> points, undistorted_points;

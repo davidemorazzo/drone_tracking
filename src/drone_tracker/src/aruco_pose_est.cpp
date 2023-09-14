@@ -30,6 +30,8 @@ public:
 			this->ros_namespace = this->get_namespace();
 		}
 
+		rclcpp::sleep_for(2000ms);
+
 		marker_pos_sub = create_subscription<std_msgs::msg::Float64MultiArray>(
 			std::string(ros_namespace + "/camera/marker_pos"), 10, 
 			std::bind(& ArucoPoseEst::sensor_cb, this, _1));
@@ -65,19 +67,19 @@ private:
 		if(! msg.data.empty()){
 
 			/*Filter only the needed marker ids*/
-			int marker_id = int(msg.data[0]);
-			if (marker_id != 23) {return;}
+			// int marker_id = int(msg.data[0]);
+			// if (marker_id != 23) {return;}
 
-			Eigen::Matrix4d camera_mtx = this->cameraTrasl(msg.data[1], msg.data[2]);
+			try{
+				Eigen::Matrix4d camera_mtx = this->cameraTrasl(msg.data[1], msg.data[2]);
 
-			this->broadcast_marker_tf(
-				-camera_mtx(0,3),						
-				-camera_mtx(1,3),					
-				camera_mtx(2,3)						
-			);
+				this->broadcast_marker_tf(
+					-camera_mtx(0,3),						
+					-camera_mtx(1,3),					
+					camera_mtx(2,3)						
+				);
 
 			/* Polar coordinates */
-			try{
 				std::vector<float> rho_theta = this->polar_coordinates(
 					this->ros_namespace.substr(1), this->ros_namespace.substr(1)+"/marker");
 				// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
@@ -114,10 +116,11 @@ private:
 	Eigen::Matrix4d cameraTrasl(double marker_cx, double marker_cy){
 		/*Camera position*/
 		geometry_msgs::msg::TransformStamped camera_tf;
+		rclcpp::Time now = this->get_clock()->now();
 		std::string camera_frame_id = this->ros_namespace.substr(1) + "/camera";
 		camera_tf = tf_buffer_->lookupTransform(
 			"map", camera_frame_id,
-			tf2::TimePointZero);
+			now, 200ms);
 
 		Eigen::Matrix<double, 3, 1> image_plane;
 

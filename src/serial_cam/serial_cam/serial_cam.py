@@ -24,8 +24,8 @@ class SerialCamera(Node) :
         )
 
         self.ros_namespace = self.get_namespace()
-        if ros_namespace == '/':
-            ros_namespace = ""
+        if self.ros_namespace == '/':
+            self.ros_namespace = ""
 
         self.static_broadcaster = StaticTransformBroadcaster(self)
         self.camera_param_pub = self.create_publisher(CameraInfo, self.ros_namespace+"/camera/camera_info", 10)
@@ -33,11 +33,11 @@ class SerialCamera(Node) :
         
         ## Publish camera reference frame
         t = TransformStamped()
-        q = quaternion_from_euler(3.1415, 3.1415, 0.0) 
-        t.header.stamp = self.get_clock().now()
-        t.header.frame_id = self.ros_namespace
-        t.child_frame_id = self.ros_namespace + "/camera"
-        t.transform.translation.x = 0.7
+        q = quaternion_from_euler(0.0, 3.1415, 3.1415) 
+        t.header.stamp = self.get_clock().now().to_msg()
+        t.header.frame_id = self.ros_namespace[1:]
+        t.child_frame_id = self.ros_namespace[1:] + "/camera"
+        t.transform.translation.x = 0.07
         t.transform.translation.y = 0.0
         t.transform.translation.z = 0.0
         t.transform.rotation.x = q[0]
@@ -47,19 +47,19 @@ class SerialCamera(Node) :
         self.static_broadcaster.sendTransform(t)
 
         ## Publish camera intrinsic params
-        info = CameraInfo()
-        info.d = [-0.40435636, 0.05816364 , 0.00363366 , 0.00228936 , 0.1716887 ]
-        info.k = [153.75337327, 0.0e+00, 77.20143553, 
+        self.info = CameraInfo()
+        self.info.d = [-0.40435636, 0.05816364 , 0.00363366 , 0.00228936 , 0.1716887 ]
+        self.info.k = [153.75337327, 0.0e+00, 77.20143553, 
 			0.0e+00, 153.95236529, 58.43806698,     
 			0.0e+00, 0.0e+00, 1.0e+00 ]
-        self.camera_param_pub.publish(info)
+        self.camera_param_pub.publish(self.info)
 
         self.read_serial()
 
 
     def read_serial(self):
         print("Initialising serial port")
-        with serial.Serial('/dev/ttyUSB0', 115200) as ser:
+        with serial.Serial('/dev/ttyS2', 115200) as ser:
             ser.flush()
             while(True):
                 line = ser.readline()
@@ -76,8 +76,9 @@ class SerialCamera(Node) :
                     new_msg.data.append(tag_cx)
                     new_msg.data.append(tag_cy)
                     self.marker_info_pub.publish(new_msg)
-                except:
-                    pass
+                    self.camera_param_pub.publish(self.info) 
+                except Exception as e:
+                    self.logger.info(e)
         
 def quaternion_from_euler(roll, pitch, yaw) -> list:
     """
@@ -111,3 +112,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
