@@ -30,20 +30,21 @@ class SerialCamera(Node) :
         self.static_broadcaster = StaticTransformBroadcaster(self)
         self.camera_param_pub = self.create_publisher(CameraInfo, self.ros_namespace+"/camera/camera_info", 10)
         self.marker_info_pub = self.create_publisher(Float64MultiArray, self.ros_namespace+"/camera/marker_pos", 10)
+        self.serial_timer = self.create_timer(0.1, self.timer_cb)
         
         ## Publish camera reference frame
         t = TransformStamped()
-        q = quaternion_from_euler(0.0, 3.1415, 3.1415) 
+        # q = quaternion_from_euler(0.0, 3.1415, 3.1415) 
         t.header.stamp = self.get_clock().now().to_msg()
         t.header.frame_id = self.ros_namespace[1:]
         t.child_frame_id = self.ros_namespace[1:] + "/camera"
         t.transform.translation.x = 0.07
         t.transform.translation.y = 0.0
         t.transform.translation.z = 0.0
-        t.transform.rotation.x = q[0]
-        t.transform.rotation.y = q[1]
-        t.transform.rotation.z = q[2]
-        t.transform.rotation.w = q[3]
+        t.transform.rotation.x = 0.0 #q[0]
+        t.transform.rotation.y = 0.0 #q[1]
+        t.transform.rotation.z = 1.0 #q[2]
+        t.transform.rotation.w = 0.0 #q[3]
         self.static_broadcaster.sendTransform(t)
 
         ## Publish camera intrinsic params
@@ -70,13 +71,14 @@ class SerialCamera(Node) :
                     tag_id = float(fields[0])
                     tag_cx = float(fields[1])
                     tag_cy = float(fields[2])
-
-                    new_msg = Float64MultiArray()
-                    new_msg.data.append(tag_id)
-                    new_msg.data.append(tag_cx)
-                    new_msg.data.append(tag_cy)
-                    self.marker_info_pub.publish(new_msg)
-                    self.camera_param_pub.publish(self.info) 
+                
+                    if tag_id == 2:
+                        new_msg = Float64MultiArray()
+                        new_msg.data.append(tag_id)
+                        new_msg.data.append(tag_cx)
+                        new_msg.data.append(tag_cy)
+                        self.marker_info_pub.publish(new_msg)
+                        self.camera_param_pub.publish(self.info) 
                 except Exception as e:
                     self.logger.info(e)
         
