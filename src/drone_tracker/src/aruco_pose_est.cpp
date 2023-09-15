@@ -78,18 +78,22 @@ private:
 					-camera_mtx(1,3),					
 					camera_mtx(2,3)						
 				);
+			}catch(...){
+				RCLCPP_WARN(get_logger(), "Error calculating marker position");
+			}
 
+			try{
 			/* Polar coordinates */
 				std::vector<float> rho_theta = this->polar_coordinates(
 					this->ros_namespace.substr(1), this->ros_namespace.substr(1)+"/marker");
-				// RCLCPP_INFO(get_logger(), "Rho: %.3f Theta: %.3f", rho_theta[0], rho_theta[1]/3.15*180.0f);
+
 				std_msgs::msg::Float64MultiArray rho_theta_msg;
-				rho_theta_msg.data.push_back(float(rho_theta[0]));
-				rho_theta_msg.data.push_back(float(rho_theta[1]));
-				rho_theta_msg.data.push_back(float(this->now().nanoseconds())/1E9f);
+				rho_theta_msg.data.push_back(rho_theta[0]);
+				rho_theta_msg.data.push_back(rho_theta[1]);
+				rho_theta_msg.data.push_back(this->get_clock()->now().seconds());
 				this->rho_theta_pub->publish(rho_theta_msg);
-			}catch(...){
-				RCLCPP_WARN(get_logger(), "Error generating polar coordinates");
+			}catch(tf2::TransformException &ex){
+				RCLCPP_WARN(get_logger(), "Transform error: %s", ex.what());
 			}
 		}
 		
@@ -156,8 +160,8 @@ private:
 		geometry_msgs::msg::TransformStamped t;
 		tf2::Quaternion q;
 		t.header.stamp = this->get_clock()->now();
-		t.header.frame_id = this->ros_namespace + "/camera";
-		t.child_frame_id = this->ros_namespace + "/marker";
+		t.header.frame_id = this->ros_namespace.substr(1) + "/camera";
+		t.child_frame_id = this->ros_namespace.substr(1) + "/marker";
 		t.transform.translation.x = x;
 		t.transform.translation.y = y;
 		t.transform.translation.z = z;

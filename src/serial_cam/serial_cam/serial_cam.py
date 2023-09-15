@@ -30,7 +30,7 @@ class SerialCamera(Node) :
         self.static_broadcaster = StaticTransformBroadcaster(self)
         self.camera_param_pub = self.create_publisher(CameraInfo, self.ros_namespace+"/camera/camera_info", 10)
         self.marker_info_pub = self.create_publisher(Float64MultiArray, self.ros_namespace+"/camera/marker_pos", 10)
-        self.serial_timer = self.create_timer(0.1, self.timer_cb)
+        self.serial_timer = self.create_timer(0.06, self.timer_cb)
         
         ## Publish camera reference frame
         t = TransformStamped()
@@ -45,7 +45,7 @@ class SerialCamera(Node) :
         t.transform.rotation.y = 0.0 #q[1]
         t.transform.rotation.z = 1.0 #q[2]
         t.transform.rotation.w = 0.0 #q[3]
-        self.static_broadcaster.sendTransform(t)
+        # self.static_broadcaster.sendTransform(t)
 
         ## Publish camera intrinsic params
         self.info = CameraInfo()
@@ -55,32 +55,31 @@ class SerialCamera(Node) :
 			0.0e+00, 0.0e+00, 1.0e+00 ]
         self.camera_param_pub.publish(self.info)
 
-        self.read_serial()
-
-
-    def read_serial(self):
         print("Initialising serial port")
-        with serial.Serial('/dev/ttyS2', 115200) as ser:
-            ser.flush()
-            while(True):
-                line = ser.readline()
-                line = line.decode('utf-8')
-                print(f"Publishing {line}")
-                fields = line.split(",")
-                try:
-                    tag_id = float(fields[0])
-                    tag_cx = float(fields[1])
-                    tag_cy = float(fields[2])
-                
-                    if tag_id == 2:
-                        new_msg = Float64MultiArray()
-                        new_msg.data.append(tag_id)
-                        new_msg.data.append(tag_cx)
-                        new_msg.data.append(tag_cy)
-                        self.marker_info_pub.publish(new_msg)
-                        self.camera_param_pub.publish(self.info) 
-                except Exception as e:
-                    self.logger.info(e)
+        self.serial_dev = serial.Serial('/dev/ttyS2', 115200)
+        self.serial_dev.flush()
+
+
+    def timer_cb(self):
+        line = self.serial_dev.readline()
+        line = line.decode('utf-8')
+        print(f"Publishing {line}")
+        fields = line.split(",")
+        try:
+            tag_id = float(fields[0])
+            tag_cx = float(fields[1])
+            tag_cy = float(fields[2])
+        
+            if tag_id == 2:
+                new_msg = Float64MultiArray()
+                new_msg.data.append(tag_id)
+                new_msg.data.append(tag_cx)
+                new_msg.data.append(tag_cy)
+                self.marker_info_pub.publish(new_msg)
+                self.camera_param_pub.publish(self.info) 
+        except Exception as e:
+            self.get_logger().info(e)
+        
         
 def quaternion_from_euler(roll, pitch, yaw) -> list:
     """

@@ -52,17 +52,6 @@ $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 $<INSTALL_INTERFACE:include>)
 target_compile_features(aruco_pose PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-############ OPENMV CAMERA NODE ###################
-add_executable(openmv_camera 
-  src/open_mv_camera.cpp)
-
-target_link_libraries(openmv_camera ${OpenCV_LIBS})
-ament_target_dependencies(openmv_camera rclcpp std_msgs sensor_msgs px4_msgs geometry_msgs tf2 tf2_ros)
-target_include_directories(openmv_camera PUBLIC
-$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-$<INSTALL_INTERFACE:include>)
-target_compile_features(openmv_camera PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
-
 ############## VEHICLE NODE ######################
 add_executable(vehicle 
   src/vehicle.cpp)
@@ -83,7 +72,17 @@ target_include_directories(estimator PUBLIC
   $<INSTALL_INTERFACE:include>)
 target_compile_features(estimator PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS estimator vehicle openmv_camera aruco_pose gazebo_camera_driver
+########### ESTIMATOR NODE 2 DRONES ################
+add_executable(estimator2
+  src/EASN_estimation_2.cpp)
+ament_target_dependencies(estimator2 px4_msgs rclcpp std_msgs geometry_msgs)
+
+target_include_directories(estimator2 PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_compile_features(estimator2 PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+install(TARGETS estimator estimator2 vehicle aruco_pose gazebo_camera_driver
   DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
