@@ -11,6 +11,8 @@ Vehicle::Vehicle() : Node("vehicle_node"){
 	}else{
 		this->ros_namespace = this->get_namespace();
 	}
+
+	this->declare_parameter("height", -2.0);
 	
 	/*Offboard control mode message*/
 	this->offboard_control_mode = std::make_shared<OffboardControlMode>();
@@ -122,6 +124,7 @@ void Vehicle::mission_update(){
 
 	current_state = next_state;
 	VehicleCommand cmd;
+	float height = 2;
 
 	switch(current_state){
 		case IDLE:
@@ -157,11 +160,12 @@ void Vehicle::mission_update(){
 			{if(this->flocking_start)
 			{
 				RCLCPP_INFO(get_logger(), "TAKEOFF=>MISSION");
-				next_state = MissionState::LANDING;
+				next_state = MissionState::MISSION;
 			}
 			else
 			{
-				publish_pos_setpoint(0.0, 0.0, -1, 0);
+				height = this->get_parameter("height").get_parameter_value().get<float>();
+				publish_pos_setpoint(0.0, 0.0, height, 0);
 				next_state = MissionState::TAKEOFF;
 			}}
 			break;
@@ -247,7 +251,8 @@ void Vehicle::estimator_cb(const std_msgs::msg::Float64MultiArray & message){
 
 	/*Send the setpoint to the drone*/
 	if(this->current_state == MissionState::MISSION){
-		publish_hor_acc_setpoint(this->flocking_ax, this->flocking_ay, -2.0, 0);
+		float height = this->get_parameter("height").get_parameter_value().get<float>();
+		publish_hor_acc_setpoint(this->flocking_ax, this->flocking_ay, height, 0);
 	}
 }
 

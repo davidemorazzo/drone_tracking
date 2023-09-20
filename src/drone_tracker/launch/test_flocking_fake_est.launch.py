@@ -49,7 +49,8 @@ def generate_launch_description():
         package='drone_tracker',
         executable='aruco_pose',
         name=f'aruco_pose_2',
-        namespace=f'/drone2')
+        namespace=f'/drone2',
+        parameters=[{'fake_measure':True}])
     )
 
     nodes_list.append(
@@ -57,7 +58,8 @@ def generate_launch_description():
         package='drone_tracker',
         executable='aruco_pose',
         name=f'aruco_pose_3',
-        namespace=f'/drone3')
+        namespace=f'/drone3',
+        parameters=[{'fake_measure':True}])
     )
     # ------ ESTIMATOR ------ #
     nodes_list.append(
@@ -68,7 +70,7 @@ def generate_launch_description():
         namespace=f'/drone2',
         parameters=[
             {"self_id":"0"},
-            {"nA_id":"1"},
+            {"nA_id":"1"}
         ])
     )
     nodes_list.append(
@@ -79,7 +81,7 @@ def generate_launch_description():
         namespace=f'/drone3',
         parameters=[
             {"self_id":"1"},
-            {"nA_id":"0"},
+            {"nA_id":"0"}
         ])
     )
 

@@ -104,6 +104,7 @@ public:
 			
 			X = x_pred(0) - (self_odom.position[0]); //relative position between predicted target and UAV along x axis 
 			Y = x_pred(1) + (self_odom.position[1]); //relative position between predicted target and UAV along y axis 
+			if(X==0 || Y==0) return;
 
 			grad_h << X/sqrt(pow(X,2)+pow(Y,2)), Y/sqrt(pow(X,2)+pow(Y,2)), 0, 0,
 				-Y/(pow(X,2)+pow(Y,2))    , X/(pow(X,2)+pow(Y,2))    , 0, 0; // compute gradient of h to use in eq. (17) of EASN
@@ -121,8 +122,14 @@ public:
 			// eq. (17) of EASN
 			I_meas = grad_h.transpose()*R.inverse()*grad_h;
 			i_meas = grad_h.transpose()*R.inverse()*(diff + grad_h*x_pred);
-			
-			
+			if(I_meas.hasNaN()||i_meas.hasNaN()) RCLCPP_INFO(get_logger(), "NaN log n.2");
+			if(R.inverse().hasNaN()) RCLCPP_INFO(get_logger(), "NaN log n.6");
+			if(grad_h.transpose().hasNaN() || grad_h.hasNaN()){
+				RCLCPP_INFO(get_logger(), "grad_h=%f, %f, %f, %f", grad_h(0,0), grad_h(0,1),grad_h(1,0),grad_h(1,1));
+			} 
+			if(diff.hasNaN()) RCLCPP_INFO(get_logger(), "NaN log n.5");
+
+
 			//////////////////////////////UPDATE///////////////////////////////    
 			
 			//get the information matrix and vector from neighbors
@@ -135,14 +142,23 @@ public:
 				info_nA.data[16], info_nA.data[17], info_nA.data[18], info_nA.data[19];
 				
 			}
+
+			if(i_meas_nA.hasNaN() || I_meas_nA.hasNaN()){
+				RCLCPP_INFO(get_logger(), "Information matrix or vectors are NaN");
+			}
 			
 			// eq. (18) of EASN 
 			Y_est = P_pred.inverse() + I_meas + I_meas_nA;	
-			y_est = P_pred.inverse() * x_pred + i_meas + i_meas_nA; 
+			y_est = P_pred.inverse() * x_pred + i_meas + i_meas_nA;
+			if(Y_est.hasNaN()||y_est.hasNaN()) RCLCPP_INFO(get_logger(), "NaN log n.3");
 			
 			// compute the actual estimate vector
 			x_est = Y_est.inverse()*y_est;
-			
+			if (x_est.hasNaN()){
+					x_est = {0,0,0,0};
+					RCLCPP_INFO(get_logger(), "NaN detected, resetting x_est");
+			}
+
 			// prepare the information matrix and vector to send to neighbors
 			self_info.data.clear();	
 			for(int i = 0; i < n; i++){self_info.data.push_back(i_meas(i));}
@@ -160,14 +176,10 @@ public:
 			my_est.data.push_back(h_meas(0));
 			my_est.data.push_back(h_meas(1));
 			
-			
-			this->self_info_pub->publish(self_info);
+			if (!i_meas.hasNaN() && !I_meas.hasNaN()){
+				this->self_info_pub->publish(self_info);
+			}
 			this->self_estimate_pub->publish(my_est);
-			
-			/* in rho_theta.data[6] we find the time instant in which 
-			the last measurement was performed. This is crucial to obtain precise velocity estimate. */
-			// prev_time = rho_theta.data[6];
-			// prev_time = this->last_sensor_info.data[3];
 	};
 	
 	/*Flocking Algorithm*/
@@ -222,11 +234,6 @@ public:
 		dist_phi[3] =    x_est(1) - (-this->self_odom.position[1]); 
 		dist[3] = sqrt(pow(x_est(0) - (this->self_odom.position[0]),2) + 
 						pow(x_est(1) + (this->self_odom.position[1]),2));
-			
-		
-		
-		// if(count > 20){k_abs = 1;} //start chasing the target after 20 iterations (1 second). This is because the initial estimates are very far from actual target states.
-		// count = count +1;
 		k_abs=1;
 		
 		//compute control input along x axis
@@ -253,20 +260,6 @@ public:
 		//discrete version of eq. (9) of EASN.  velocity error between UAV and target. 
 		e_vx_0t = k_abs * ((x_est(2) - this->self_odom.velocity[0])) + e_vx_0t;
 		e_vy_0t = k_abs * ((x_est(3) + this->self_odom.velocity[1])) + e_vy_0t;
-			
-
-		
-		/*        dist_plot.pose.orientation.x = dist[std::stoi(nA)];
-		dist_plot.pose.orientation.y = dist[std::stoi(nB)];
-		dist_plot.pose.orientation.z = dist[3];
-		dist_plot.pose.orientation.w = x_est(3);*/
-		
-		// my_global.publish(self_state_global);
-		// my_vel.publish(self_vel);        
-		// distances.publish(dist_plot);
-	
-		// ros::spinOnce();
-		// rate.sleep();
 	}
 
 	/*flocking timer callback*/
@@ -361,7 +354,8 @@ private:
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr flocking_stats;
 	rclcpp::TimerBase::SharedPtr flocking_timer;
 
-	px4_msgs::msg::VehicleOdometry nA_odom, self_odom;
+	px4_msgs::msg::VehicleOdometry nA_odom;
+	px4_msgs::msg::VehicleOdometry self_odom;
 	std_msgs::msg::Float64MultiArray info_nA, self_info;
 	std_msgs::msg::Float64MultiArray my_est;
 	std_msgs::msg::Float64MultiArray last_sensor_info;
@@ -397,7 +391,10 @@ private:
 		this->flocking_stats = this->create_publisher<std_msgs::msg::Float64MultiArray>("/drone" + self_topic_id + "/flocking_info",10);
 	}
 
-	void self_odom_cb(const px4_msgs::msg::VehicleOdometry msg){this->self_odom = msg;};
+	void self_odom_cb(const px4_msgs::msg::VehicleOdometry msg){
+		this->self_odom = msg;
+		// RCLCPP_INFO(get_logger(), "PX=%f PY=%f", this->self_odom.position[0], this->self_odom.position[1]);
+	}
 	void nA_odom_cb(const px4_msgs::msg::VehicleOdometry msg){this->nA_odom = msg;};
 	void nA_info_cb(const std_msgs::msg::Float64MultiArray msg){this->info_nA = msg;};
 

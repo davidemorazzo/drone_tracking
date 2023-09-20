@@ -6,8 +6,9 @@ from rclpy.qos import (
     QoSHistoryPolicy)
 
 import math
+import threading
 
-from tf2_ros import StaticTransformBroadcaster
+# from tf2_ros import StaticTransformBroadcaster
 
 import serial
 from std_msgs.msg import Float64MultiArray
@@ -27,10 +28,10 @@ class SerialCamera(Node) :
         if self.ros_namespace == '/':
             self.ros_namespace = ""
 
-        self.static_broadcaster = StaticTransformBroadcaster(self)
+        # self.static_broadcaster = StaticTransformBroadcaster(self)
         self.camera_param_pub = self.create_publisher(CameraInfo, self.ros_namespace+"/camera/camera_info", 10)
         self.marker_info_pub = self.create_publisher(Float64MultiArray, self.ros_namespace+"/camera/marker_pos", 10)
-        self.serial_timer = self.create_timer(0.06, self.timer_cb)
+        # self.serial_timer = self.create_timer(0.06, self.read_serial)
         
         ## Publish camera reference frame
         t = TransformStamped()
@@ -59,26 +60,29 @@ class SerialCamera(Node) :
         self.serial_dev = serial.Serial('/dev/ttyS2', 115200)
         self.serial_dev.flush()
 
+        self.thread = threading.Thread(target=self.read_serial)
 
-    def timer_cb(self):
-        line = self.serial_dev.readline()
-        line = line.decode('utf-8')
-        print(f"Publishing {line}")
-        fields = line.split(",")
-        try:
-            tag_id = float(fields[0])
-            tag_cx = float(fields[1])
-            tag_cy = float(fields[2])
-        
-            if tag_id == 2:
-                new_msg = Float64MultiArray()
-                new_msg.data.append(tag_id)
-                new_msg.data.append(tag_cx)
-                new_msg.data.append(tag_cy)
-                self.marker_info_pub.publish(new_msg)
-                self.camera_param_pub.publish(self.info) 
-        except Exception as e:
-            self.get_logger().info(e)
+
+    def read_serial(self):
+        while True:
+            line = self.serial_dev.readline()
+            line = line.decode('utf-8')
+            print(f"Publishing {line}")
+            fields = line.split(",")
+            try:
+                tag_id = float(fields[0])
+                tag_cx = float(fields[1])
+                tag_cy = float(fields[2])
+            
+                if tag_id == 2:
+                    new_msg = Float64MultiArray()
+                    new_msg.data.append(tag_id)
+                    new_msg.data.append(tag_cx)
+                    new_msg.data.append(tag_cy)
+                    self.marker_info_pub.publish(new_msg)
+                    self.camera_param_pub.publish(self.info) 
+            except Exception as e:
+                self.get_logger().info(e)
         
         
 def quaternion_from_euler(roll, pitch, yaw) -> list:

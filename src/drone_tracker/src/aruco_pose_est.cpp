@@ -1,6 +1,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include <memory>
 #include <chrono>
+#include <random>
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "px4_msgs/msg/vehicle_odometry.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
@@ -19,6 +20,23 @@ using namespace std::chrono_literals;
 using namespace std::chrono;
 using std::placeholders::_1;
 
+struct normal_random_variable{
+    normal_random_variable(Eigen::MatrixXd const& covar)
+        : normal_random_variable(Eigen::VectorXd::Zero(covar.rows()), covar)
+    {}
+    normal_random_variable(Eigen::VectorXd const& mean, Eigen::MatrixXd const& covar)
+        : mean(mean){
+        Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigenSolver(covar);
+        transform = eigenSolver.eigenvectors() * eigenSolver.eigenvalues().cwiseSqrt().asDiagonal();
+    }
+    Eigen::VectorXd mean;
+    Eigen::MatrixXd transform;
+    Eigen::VectorXd operator()() const{
+        static std::mt19937 gen{ std::random_device{}() };
+        static std::normal_distribution<> dist;
+        return mean + transform * Eigen::VectorXd{ mean.size() }.unaryExpr([&](auto x) { return dist(gen);});
+    }
+};
 
 class ArucoPoseEst : public rclcpp::Node {
 
@@ -30,11 +48,20 @@ public:
 			this->ros_namespace = this->get_namespace();
 		}
 
-		rclcpp::sleep_for(2000ms);
+		this->declare_parameter("fake_measure", false);
+		bool fake_measure = this->get_parameter("fake_measure").get_parameter_value().get<bool>();
 
-		marker_pos_sub = create_subscription<std_msgs::msg::Float64MultiArray>(
-			std::string(ros_namespace + "/camera/marker_pos"), 10, 
-			std::bind(& ArucoPoseEst::sensor_cb, this, _1));
+		/*Chooses if creating a timer to publish the position of a fake marker or to 
+		listen to the camera measurements to identify a real marker.*/
+		if (fake_measure){
+			RCLCPP_INFO(get_logger(), "Publishing fake measurements...");
+			this->fake_measure_timer = this->create_wall_timer(66ms, std::
+				bind(& ArucoPoseEst::fake_measure_cb, this));
+		}else{
+			marker_pos_sub = create_subscription<std_msgs::msg::Float64MultiArray>(
+				std::string(ros_namespace + "/camera/marker_pos"), 10, 
+				std::bind(& ArucoPoseEst::sensor_cb, this, _1));
+		}
 
 		rho_theta_pub = create_publisher<std_msgs::msg::Float64MultiArray>(
 			std::string(ros_namespace + "/sensor_measure"), 10);
@@ -56,10 +83,47 @@ private:
 	rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr rho_theta_pub;
 	rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr marker_pos_sub;
 	rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub;
-	
+	rclcpp::TimerBase::SharedPtr fake_measure_timer;
+
 	std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster;
 	std::shared_ptr<tf2_ros::TransformListener> tf_listener_{nullptr};
   	std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+
+	/* Create a transform between map to droneX/marker with fakes coordinates
+	in order to create the bearing sensor readings and send it to the EASN
+	estimator node.*/
+	void fake_measure_cb(){
+		double fake_marker_x = 0.0;
+		double fake_marker_y = 0.0;
+		// double fake_marker_z = 0.0;
+		geometry_msgs::msg::TransformStamped drone_tf;
+		try{
+			drone_tf = tf_buffer_->lookupTransform("map", this->ros_namespace.substr(1),
+			tf2::TimePointZero);
+			
+			double rho = sqrt(pow(drone_tf.transform.translation.x - fake_marker_x,2) + 
+							pow(drone_tf.transform.translation.y - fake_marker_y,2));
+			double theta = atan2(fake_marker_y - drone_tf.transform.translation.y, 
+								fake_marker_x - drone_tf.transform.translation.x);
+			/*Noise generation*/
+			Eigen::MatrixXd covar(2,2);
+			covar << 0.4*pow(cos(theta),2) + 0.1*pow(rho*sin(theta),2), (-0.4+0.1)*(cos(theta)*sin(theta)),
+					(-0.4+0.1)*(cos(theta)*sin(theta)), 0.4*pow(sin(theta),2) + 0.1*pow(rho*cos(theta),2);
+			normal_random_variable sample { covar };  
+			std::vector<double> noise; 
+			noise.resize(2);
+			Eigen::Map<Eigen::VectorXd>(noise.data(), noise.size()) = sample();
+			/*Send message*/
+			std_msgs::msg::Float64MultiArray rho_theta_msg;
+			rho_theta_msg.data.push_back(rho + noise[0]);
+			rho_theta_msg.data.push_back(theta + noise[1]);
+			rho_theta_msg.data.push_back(this->get_clock()->now().seconds());
+			this->rho_theta_pub->publish(rho_theta_msg);
+
+		}catch(std::exception &ex){
+			RCLCPP_INFO(get_logger(), "%s", ex.what());
+		}
+	}
 
 	void sensor_cb(const std_msgs::msg::Float64MultiArray & msg){
 		

@@ -10,7 +10,8 @@ def generate_launch_description():
         package='drone_tracker',
         executable='vehicle',
         namespace=f'/drone2',
-        name=f'vehicle')
+        name=f'vehicle',
+        parameters=[{"height":-1}])
     )
 
     nodes_list.append(
@@ -18,7 +19,8 @@ def generate_launch_description():
         package='drone_tracker',
         executable='vehicle',
         namespace=f'/drone3',
-        name=f'vehicle')
+        name=f'vehicle',
+        parameters=[{"height":-1}])
     )
 
     # nodes_list.append(
