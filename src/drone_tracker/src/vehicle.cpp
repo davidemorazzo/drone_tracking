@@ -160,7 +160,7 @@ void Vehicle::mission_update(){
 			{if(this->flocking_start)
 			{
 				RCLCPP_INFO(get_logger(), "TAKEOFF=>MISSION");
-				next_state = MissionState::MISSION;
+				next_state = MissionState::LANDING;
 			}
 			else
 			{

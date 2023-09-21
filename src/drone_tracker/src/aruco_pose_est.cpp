@@ -115,8 +115,8 @@ private:
 			Eigen::Map<Eigen::VectorXd>(noise.data(), noise.size()) = sample();
 			/*Send message*/
 			std_msgs::msg::Float64MultiArray rho_theta_msg;
-			rho_theta_msg.data.push_back(rho + noise[0]);
-			rho_theta_msg.data.push_back(theta + noise[1]);
+			rho_theta_msg.data.push_back(rho + noise[0]*0.3);
+			rho_theta_msg.data.push_back(theta + noise[1]*0.3);
 			rho_theta_msg.data.push_back(this->get_clock()->now().seconds());
 			this->rho_theta_pub->publish(rho_theta_msg);
 
@@ -208,11 +208,16 @@ private:
 	}
 
 	std::vector<float> polar_coordinates(std::string parent_id, std::string child_id){
-		geometry_msgs::msg::TransformStamped t;
-		t = tf_buffer_->lookupTransform(child_id, parent_id, tf2::TimePointZero);
+		geometry_msgs::msg::TransformStamped drone_tf, marker_tf;
+		drone_tf = tf_buffer_->lookupTransform("map", parent_id, tf2::TimePointZero);
+		marker_tf = tf_buffer_->lookupTransform("map", child_id, tf2::TimePointZero);
+		double delta_x = marker_tf.transform.translation.x - drone_tf.transform.translation.x;
+		double delta_y = marker_tf.transform.translation.y - drone_tf.transform.translation.y;
+		float rho = sqrt(pow(delta_x,2) + pow(delta_y,2));
+		float theta = atan2(delta_y, delta_x);
 		
-		float rho = sqrt(pow(t.transform.translation.x,2) + pow(t.transform.translation.y,2));
-		float theta = atan2(t.transform.translation.y, t.transform.translation.x);
+		// float rho = sqrt(pow(t.transform.translation.x,2) + pow(t.transform.translation.y,2));
+		// float theta = atan2(t.transform.translation.y, t.transform.translation.x);
 		
 		std::vector<float> result;
 		result.push_back(rho);

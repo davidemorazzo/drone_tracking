@@ -11,7 +11,7 @@ def generate_launch_description():
         executable='vehicle',
         namespace=f'/drone2',
         name=f'vehicle',
-        parameters=[{"height":-1.0}])
+        parameters=[{"height":-0.5}])
     )
 
     nodes_list.append(
@@ -20,7 +20,7 @@ def generate_launch_description():
         executable='vehicle',
         namespace=f'/drone3',
         name=f'vehicle',
-        parameters=[{"height":-1.0}])
+        parameters=[{"height":-0.5}])
     )
 
     nodes_list.append(
@@ -50,7 +50,7 @@ def generate_launch_description():
         executable='aruco_pose',
         name=f'aruco_pose_2',
         namespace=f'/drone2',
-        parameters=[{'fake_measure':True}])
+        parameters=[{'fake_measure':False}])
     )
 
     nodes_list.append(
@@ -59,7 +59,7 @@ def generate_launch_description():
         executable='aruco_pose',
         name=f'aruco_pose_3',
         namespace=f'/drone3',
-        parameters=[{'fake_measure':True}])
+        parameters=[{'fake_measure':False}])
     )
     # ------ ESTIMATOR ------ #
     nodes_list.append(
