@@ -37,7 +37,9 @@ def generate_launch_description():
             executable='vehicle',
             namespace=f'/drone{i}',
             name=f'vehicle{i}',
-            parameters=[{'use_sim_time':True}])
+            parameters=[
+                {'use_sim_time':True},
+                {'height' : -0.5}])
         )
         # ---- MOTION CAPTURE --- #
         nodes_list.append(
@@ -66,7 +68,7 @@ def generate_launch_description():
             namespace=f'/drone{i}',
             parameters=[
                 {'use_sim_time':True},
-                {'fake_measure':True}])
+                {'fake_measure':False}])
         )
     # ------ ESTIMATOR ------ #
     nodes_list.append(

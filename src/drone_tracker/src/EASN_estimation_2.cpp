@@ -226,8 +226,11 @@ public:
 		u_vx = -(this->self_odom.velocity[0] - this->nA_odom.velocity[0]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(r_comm)); 
 		//compute y component of eq. (5) in EASN 
 		u_vy = -(-this->self_odom.velocity[0] + this->nA_odom.velocity[1]) * rho_vel(sigma_norm(dist[std::stoi(nA)])/sigma_norm(r_comm));
-			
-	
+		
+		// Set estimate states to zero to ignore the estimation
+		// FIXME: temporary hack !!! :D
+		x_est << 0.0, 0.0, 0.0, 0.0;
+
 		// compute relative distance and relative x and y positions between UAV and TARGET
 		// Y has to be inverted because self_odom ref frame is FRD and x_est is FLU
 		dist_lambda[3] = x_est(0) - (this->self_odom.position[0]); 
@@ -439,13 +442,13 @@ private:
 	double k_P = 0.6;					// Proportional term of flock distance
 	double k_d = 0.5;//0.18;					// Proportional term angets velocity matching
 	/* Target tracking */
-	double c_1 = 0.5;					// Proportional term target position tracking
+	double c_1 = 0.6;					// Proportional term target position tracking
 	double c_2 = 10;					// Proportional term target velocity matching
 	double c_int = 0.005;				// Integral term on target velocity matching
 	double d_int = 1.5; 				// Attraction profile of target position
 
-	double target_distance = 1;			// [m] distance between drones
-	double r_comm = 1.2;				// [m] communication radius
+	double target_distance = 1.6;		// [m] distance between drones
+	double r_comm = 2.0;				// [m] communication radius
 
 	std::vector<double> lambda;			// [rad] latitude
 	std::vector<double> phi;			// [rad] longitude
